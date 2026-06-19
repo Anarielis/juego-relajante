@@ -1,8 +1,7 @@
-// CalmSpace Analytics Service
-// Skeletons for Google Analytics 4 and Microsoft Clarity
+import clarity from '@microsoft/clarity';
 
 const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
-const CLARITY_ID = import.meta.env.VITE_CLARITY_PROJECT_ID;
+const CLARITY_ID = import.meta.env.VITE_CLARITY_PROJECT_ID || 'x9ovnqub2r';
 
 // Dynamically inject scripts if IDs are provided
 export const initAnalytics = () => {
@@ -24,17 +23,12 @@ export const initAnalytics = () => {
   }
 
   if (CLARITY_ID) {
-    const script3 = document.createElement('script');
-    script3.type = 'text/javascript';
-    script3.innerHTML = `
-      (function(c,l,a,r,i,t,y){
-          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-      })(window, document, "clarity", "script", "${CLARITY_ID}");
-    `;
-    document.head.appendChild(script3);
-    console.log("Microsoft Clarity Initialized with ID:", CLARITY_ID);
+    try {
+      clarity.init(CLARITY_ID);
+      console.log("Microsoft Clarity NPM Initialized with ID:", CLARITY_ID);
+    } catch (e) {
+      console.error("Clarity initialization failed:", e);
+    }
   }
 };
 
@@ -52,8 +46,12 @@ export const trackEvent = (eventName, params = {}) => {
   if (window.gtag && GA_ID) {
     window.gtag('event', eventName, params);
   }
-  if (window.clarity && CLARITY_ID) {
-    window.clarity("event", eventName);
+  if (CLARITY_ID) {
+    try {
+      clarity.event(eventName);
+    } catch (e) {
+      console.warn("Clarity custom event tracking failed:", e);
+    }
   }
   console.log(`[Analytics Event] ${eventName}:`, params);
 };
