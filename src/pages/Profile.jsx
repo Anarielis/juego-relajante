@@ -85,8 +85,8 @@ const Profile = () => {
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-poppins">
             {profile?.username || 'Cargando...'}
           </h2>
-          <p className="text-sm font-nunito text-slate-400 dark:text-slate-400 mt-1">
-            {profile?.email}
+          <p className="text-sm font-nunito text-indigo-500/80 dark:text-indigo-400/80 mt-1 font-semibold">
+            @{profile?.username}
           </p>
           <div className="flex items-center justify-center md:justify-start space-x-1.5 text-xs text-slate-500 dark:text-slate-400 mt-3 font-nunito bg-slate-100/50 dark:bg-slate-950/20 px-3 py-1.5 rounded-full w-fit">
             <Calendar className="w-4 h-4 text-slate-400" />

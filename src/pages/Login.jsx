@@ -2,41 +2,31 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Lock, AlertCircle, ArrowRight, CheckCircle } from 'lucide-react';
+import { User, Lock, AlertCircle, ArrowRight, Info } from 'lucide-react';
 import { trackPageView } from '../analytics/tracking';
 
 const Login = () => {
   const { t, language } = useApp();
-  const { loginUser, recoverPassword } = useAuth();
+  const { loginUser } = useAuth();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [showRecoveryInfo, setShowRecoveryInfo] = useState(false);
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
     trackPageView('Login Screen');
   }, []);
 
-  const handleValidateEmail = (val) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(val);
-  };
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccessMsg('');
+    setShowRecoveryInfo(false);
 
-    if (!email) {
-      setError(language === 'es' ? 'El correo electrónico es obligatorio.' : 'Email is required.');
-      return;
-    }
-    if (!handleValidateEmail(email)) {
-      setError(language === 'es' ? 'Ingresa un correo electrónico válido.' : 'Please enter a valid email.');
+    if (!username.trim()) {
+      setError(language === 'es' ? 'El nombre de usuario es obligatorio.' : 'Username is required.');
       return;
     }
     if (!password) {
@@ -46,41 +36,11 @@ const Login = () => {
 
     try {
       setLoading(true);
-      await loginUser(email, password);
-      // Auth listener redirects automatically, but navigate as safeguard
+      await loginUser(username, password);
       navigate('/dashboard');
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError(language === 'es' ? 'Credenciales incorrectas. Inténtalo de nuevo.' : 'Invalid credentials. Please try again.');
-      } else {
-        setError(err.message || (language === 'es' ? 'Error al iniciar sesión.' : 'Failed to log in.'));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRecovery = async () => {
-    setError('');
-    setSuccessMsg('');
-    if (!email) {
-      setError(language === 'es' ? 'Introduce tu correo en el campo superior para recuperar la contraseña.' : 'Enter your email above to recover your password.');
-      return;
-    }
-    if (!handleValidateEmail(email)) {
-      setError(language === 'es' ? 'Introduce un correo válido.' : 'Please enter a valid email.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await recoverPassword(email);
-      setSuccessMsg(language === 'es' 
-        ? 'Se ha enviado un enlace de recuperación a tu correo electrónico.' 
-        : 'A password recovery link has been sent to your email.');
-    } catch (err) {
-      setError(err.message || (language === 'es' ? 'Error al enviar enlace.' : 'Failed to send recovery link.'));
+      setError(err.message || (language === 'es' ? 'Error al iniciar sesión.' : 'Failed to log in.'));
     } finally {
       setLoading(false);
     }
@@ -95,7 +55,7 @@ const Login = () => {
           {t('login')}
         </h2>
         <p className="text-sm font-nunito text-slate-500 dark:text-slate-400 text-center mb-6">
-          {language === 'es' ? 'Bienvenido de vuelta a tu rincón de bienestar.' : 'Welcome back to your wellness corner.'}
+          {language === 'es' ? 'Inicia sesión con tu usuario y contraseña.' : 'Log in with your username and password.'}
         </p>
 
         {error && (
@@ -105,26 +65,30 @@ const Login = () => {
           </div>
         )}
 
-        {successMsg && (
-          <div className="flex items-center space-x-2 p-4 mb-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-sm border border-emerald-100/50 dark:border-emerald-950/40">
-            <CheckCircle className="w-5 h-5 flex-shrink-0" />
-            <span className="font-nunito font-semibold">{successMsg}</span>
+        {showRecoveryInfo && (
+          <div className="flex items-start space-x-2.5 p-4 mb-4 rounded-xl bg-blue-50 dark:bg-blue-950/25 text-blue-600 dark:text-blue-300 text-xs border border-blue-100/50 dark:border-blue-950/40">
+            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div className="font-nunito leading-relaxed">
+              {language === 'es' 
+                ? 'Al no utilizar correo electrónico, no es posible restablecer tu contraseña automáticamente. Ponte en contacto con el administrador de CalmSpace.' 
+                : 'As emails are not used, self-service resets are unavailable. Please contact the CalmSpace administrator.'}
+            </div>
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 font-poppins">
-              {t('email')}
+              {t('username')}
             </label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />
+              <User className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />
               <input
-                type="email"
-                placeholder="nombre@ejemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900"
+                type="text"
+                placeholder={language === 'es' ? 'usuario_calma' : 'calm_user'}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
@@ -140,25 +104,15 @@ const Login = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900"
+                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center space-x-2 text-slate-500 dark:text-slate-400 font-nunito cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded border-slate-200/50 text-indigo-600 focus:ring-indigo-500 bg-white/50"
-              />
-              <span>{language === 'es' ? 'Mantener sesión' : 'Remember me'}</span>
-            </label>
-
+          <div className="flex items-center justify-end text-sm">
             <button
               type="button"
-              onClick={handleRecovery}
+              onClick={() => setShowRecoveryInfo(true)}
               className="text-indigo-600 dark:text-indigo-400 hover:underline font-nunito font-semibold"
             >
               {language === 'es' ? '¿Olvidaste tu contraseña?' : 'Forgot password?'}
@@ -168,7 +122,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins"
           >
             <span>{loading ? (language === 'es' ? 'Iniciando...' : 'Logging in...') : t('login')}</span>
             <ArrowRight className="w-5 h-5" />

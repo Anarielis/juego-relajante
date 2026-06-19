@@ -1,20 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db, isFirebaseConfigured } from '../firebase/config';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut as firebaseSignOut, 
-  sendPasswordResetEmail,
-  onAuthStateChanged 
-} from 'firebase/auth';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { hashPassword } from '../utils/hash';
 import { trackEvent, trackAchievement } from '../analytics/tracking';
 
 const AuthContext = createContext();
 
 const DEFAULT_PROFILE = {
   username: '',
-  email: '',
+  passwordHash: '',
   createdAt: '',
   favoriteGame: 'Ninguno',
   totalTimeSpent: 0, // in minutes
@@ -40,101 +34,112 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
 
-  // Initialize and listen to Auth state changes
+  // Initialize and check active session
   useEffect(() => {
-    if (isFirebaseConfigured && auth) {
-      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-          setUser(firebaseUser);
-          await fetchUserProfile(firebaseUser.uid, firebaseUser.email);
-        } else {
-          setUser(null);
-          setProfile(null);
+    const initializeAuth = async () => {
+      const savedUserStr = localStorage.getItem('cs_active_user');
+      
+      if (!isFirebaseConfigured || !db) {
+        setDemoMode(true);
+        if (savedUserStr) {
+          try {
+            const savedUser = JSON.parse(savedUserStr);
+            setUser(savedUser);
+            await fetchUserProfile(savedUser.uid, savedUser.username, true);
+          } catch (e) {
+            console.error("Failed to parse demo session:", e);
+          }
         }
         setLoading(false);
-      });
-      return unsubscribe;
-    } else {
-      // Demo Mode local auth initialization
-      setDemoMode(true);
-      const savedUser = localStorage.getItem('cs_demo_user');
-      if (savedUser) {
-        const u = JSON.parse(savedUser);
-        setUser(u);
-        fetchUserProfile(u.uid, u.email, true);
       } else {
+        // Firebase Mode
+        if (savedUserStr) {
+          try {
+            const savedUser = JSON.parse(savedUserStr);
+            setUser(savedUser);
+            await fetchUserProfile(savedUser.uid, savedUser.username, false);
+          } catch (e) {
+            console.error("Failed to fetch profile session:", e);
+            localStorage.removeItem('cs_active_user');
+          }
+        }
         setLoading(false);
       }
-    }
+    };
+
+    initializeAuth();
   }, []);
 
-  // Fetch profile details
-  const fetchUserProfile = async (uid, email, isDemo = false) => {
+  // Fetch user profile from database
+  const fetchUserProfile = async (uid, username, isDemo = demoMode) => {
     try {
+      const todayStr = new Date().toDateString();
+
       if (!isDemo && db) {
         const docRef = doc(db, 'users', uid);
         const docSnap = await getDoc(docRef);
-        
+
         if (docSnap.exists()) {
-          const data = docSnap.data();
+          let data = docSnap.data();
+          
+          // Update consecutive login streak
+          if (data.lastLoginDate !== todayStr) {
+            const lastDate = data.lastLoginDate ? new Date(data.lastLoginDate) : null;
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            let newStreak = data.consecutiveDays || 1;
+            if (lastDate && lastDate.toDateString() === yesterday.toDateString()) {
+              newStreak += 1;
+            } else if (lastDate && lastDate.toDateString() !== todayStr) {
+              newStreak = 1;
+            }
+
+            await updateDoc(docRef, {
+              lastLoginDate: todayStr,
+              consecutiveDays: newStreak
+            });
+            data = { ...data, lastLoginDate: todayStr, consecutiveDays: newStreak };
+          }
+
           setProfile(data);
           checkAndAwardAchievements(uid, data, false);
         } else {
-          // Create new firestore profile
-          const newProfile = {
-            ...DEFAULT_PROFILE,
-            email: email,
-            username: email.split('@')[0],
-            createdAt: new Date().toISOString(),
-            lastLoginDate: new Date().toDateString(),
-            achievements: ['first_login'] // First Login achievement automatically
-          };
-          await setDoc(docRef, newProfile);
-          setProfile(newProfile);
-          trackEvent('profile_created', { email });
+          throw new Error("No se encontró el perfil del usuario.");
         }
       } else {
-        // LocalStorage mock implementation
-        const profilesKey = 'cs_demo_profiles';
-        const profiles = JSON.parse(localStorage.getItem(profilesKey) || '{}');
-        let currentProfile = profiles[uid];
-        
-        if (!currentProfile) {
-          currentProfile = {
-            ...DEFAULT_PROFILE,
-            email: email,
-            username: email.split('@')[0],
-            createdAt: new Date().toISOString(),
-            lastLoginDate: new Date().toDateString(),
-            achievements: ['first_login']
-          };
-          profiles[uid] = currentProfile;
-          localStorage.setItem(profilesKey, JSON.stringify(profiles));
-          trackEvent('profile_created_demo', { email });
-        } else {
-          // Update consecutive days logic
-          const todayStr = new Date().toDateString();
+        // Demo Mode / LocalStorage Mock
+        const profilesKey = 'cs_profiles_db';
+        const dbMock = JSON.parse(localStorage.getItem(profilesKey) || '{}');
+        let currentProfile = dbMock[uid];
+
+        if (currentProfile) {
+          // Check streak days
           if (currentProfile.lastLoginDate !== todayStr) {
             const lastDate = currentProfile.lastLoginDate ? new Date(currentProfile.lastLoginDate) : null;
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
-            
+
             if (lastDate && lastDate.toDateString() === yesterday.toDateString()) {
               currentProfile.consecutiveDays += 1;
             } else if (lastDate && lastDate.toDateString() !== todayStr) {
               currentProfile.consecutiveDays = 1;
             }
             currentProfile.lastLoginDate = todayStr;
-            profiles[uid] = currentProfile;
-            localStorage.setItem(profilesKey, JSON.stringify(profiles));
+            dbMock[uid] = currentProfile;
+            localStorage.setItem(profilesKey, JSON.stringify(dbMock));
           }
+
+          setProfile(currentProfile);
+          checkAndAwardAchievements(uid, currentProfile, true);
+        } else {
+          throw new Error("Perfil simulado no encontrado.");
         }
-        
-        setProfile(currentProfile);
-        checkAndAwardAchievements(uid, currentProfile, true);
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);
+      // Clean up session if profile fetch fails
+      logoutUser();
     }
   };
 
@@ -149,10 +154,10 @@ export const AuthProvider = ({ children }) => {
         const docRef = doc(db, 'users', user.uid);
         await updateDoc(docRef, updatedFields);
       } else {
-        const profilesKey = 'cs_demo_profiles';
-        const profiles = JSON.parse(localStorage.getItem(profilesKey) || '{}');
-        profiles[user.uid] = nextProfile;
-        localStorage.setItem(profilesKey, JSON.stringify(profiles));
+        const profilesKey = 'cs_profiles_db';
+        const dbMock = JSON.parse(localStorage.getItem(profilesKey) || '{}');
+        dbMock[user.uid] = nextProfile;
+        localStorage.setItem(profilesKey, JSON.stringify(dbMock));
       }
       
       // Recalculate achievements on updates
@@ -210,7 +215,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (modified) {
-      // Save background updates without infinite loops
+      // Save updates
       const nextProfile = { ...currentProfile, achievements };
       setProfile(nextProfile);
       
@@ -218,98 +223,142 @@ export const AuthProvider = ({ children }) => {
         const docRef = doc(db, 'users', uid);
         updateDoc(docRef, { achievements });
       } else {
-        const profilesKey = 'cs_demo_profiles';
-        const profiles = JSON.parse(localStorage.getItem(profilesKey) || '{}');
-        profiles[uid] = nextProfile;
-        localStorage.setItem(profilesKey, JSON.stringify(profiles));
+        const profilesKey = 'cs_profiles_db';
+        const dbMock = JSON.parse(localStorage.getItem(profilesKey) || '{}');
+        dbMock[uid] = nextProfile;
+        localStorage.setItem(profilesKey, JSON.stringify(dbMock));
       }
     }
   };
 
   // Registers a new user
-  const registerUser = async (username, email, password) => {
-    trackEvent('auth_register_attempt');
-    if (!demoMode && auth) {
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
-      // Wait for profile fetch which sets profile
-      return credential.user;
-    } else {
-      // Mock Registration
-      const mockUid = 'demo_user_' + Math.random().toString(36).substr(2, 9);
-      const newUser = { uid: mockUid, email };
-      
-      // Save user to active session
-      localStorage.setItem('cs_demo_user', JSON.stringify(newUser));
-      
-      // Seed details in profiles database
-      const profilesKey = 'cs_demo_profiles';
-      const profiles = JSON.parse(localStorage.getItem(profilesKey) || '{}');
-      profiles[mockUid] = {
+  const registerUser = async (username, password) => {
+    trackEvent('sign_up', { method: 'username' });
+    const normalizedUsername = username.toLowerCase().trim();
+
+    if (!isFirebaseConfigured || !db) {
+      // LocalStorage Mock Registration
+      const profilesKey = 'cs_profiles_db';
+      const dbMock = JSON.parse(localStorage.getItem(profilesKey) || '{}');
+
+      if (dbMock[normalizedUsername]) {
+        throw new Error("El nombre de usuario ya está registrado.");
+      }
+
+      const passwordHash = await hashPassword(password);
+      const newProfile = {
         ...DEFAULT_PROFILE,
-        username: username || email.split('@')[0],
-        email: email,
+        uid: normalizedUsername,
+        username: username.trim(),
+        passwordHash,
         createdAt: new Date().toISOString(),
         lastLoginDate: new Date().toDateString(),
         achievements: ['first_login']
       };
-      localStorage.setItem(profilesKey, JSON.stringify(profiles));
 
-      setUser(newUser);
-      setProfile(profiles[mockUid]);
-      setLoading(false);
-      trackEvent('auth_register_success_demo', { email });
-      return newUser;
+      dbMock[normalizedUsername] = newProfile;
+      localStorage.setItem(profilesKey, JSON.stringify(dbMock));
+
+      const activeSession = { username: username.trim(), uid: normalizedUsername };
+      localStorage.setItem('cs_active_user', JSON.stringify(activeSession));
+
+      setUser(activeSession);
+      setProfile(newProfile);
+      setDemoMode(true);
+      return activeSession;
+    } else {
+      // Real Firebase Firestore Custom Registration
+      const userRef = doc(db, 'users', normalizedUsername);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        throw new Error("El nombre de usuario ya está registrado.");
+      }
+
+      const passwordHash = await hashPassword(password);
+      const newProfile = {
+        ...DEFAULT_PROFILE,
+        uid: normalizedUsername,
+        username: username.trim(),
+        passwordHash,
+        createdAt: new Date().toISOString(),
+        lastLoginDate: new Date().toDateString(),
+        achievements: ['first_login']
+      };
+
+      await setDoc(userRef, newProfile);
+
+      const activeSession = { username: username.trim(), uid: normalizedUsername };
+      localStorage.setItem('cs_active_user', JSON.stringify(activeSession));
+
+      setUser(activeSession);
+      setProfile(newProfile);
+      return activeSession;
     }
   };
 
   // Logs user in
-  const loginUser = async (email, password) => {
-    trackEvent('auth_login_attempt');
-    if (!demoMode && auth) {
-      const credential = await signInWithEmailAndPassword(auth, email, password);
-      return credential.user;
+  const loginUser = async (username, password) => {
+    trackEvent('login', { method: 'username' });
+    const normalizedUsername = username.toLowerCase().trim();
+    const enteredHash = await hashPassword(password);
+
+    if (!isFirebaseConfigured || !db) {
+      // LocalStorage Mock Login
+      const profilesKey = 'cs_profiles_db';
+      const dbMock = JSON.parse(localStorage.getItem(profilesKey) || '{}');
+      const account = dbMock[normalizedUsername];
+
+      if (!account) {
+        throw new Error("El nombre de usuario no existe.");
+      }
+
+      if (account.passwordHash !== enteredHash) {
+        throw new Error("La contraseña es incorrecta.");
+      }
+
+      const activeSession = { username: account.username, uid: normalizedUsername };
+      localStorage.setItem('cs_active_user', JSON.stringify(activeSession));
+
+      setUser(activeSession);
+      setDemoMode(true);
+      await fetchUserProfile(normalizedUsername, account.username, true);
+      return activeSession;
     } else {
-      // Mock Login
-      // Create user if they don't exist, or log them in
-      const mockUid = 'demo_user_12345';
-      const newUser = { uid: mockUid, email };
-      
-      localStorage.setItem('cs_demo_user', JSON.stringify(newUser));
-      setUser(newUser);
-      await fetchUserProfile(mockUid, email, true);
-      setLoading(false);
-      
-      trackEvent('auth_login_success_demo', { email });
-      return newUser;
+      // Real Firebase Firestore Login
+      const userRef = doc(db, 'users', normalizedUsername);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        throw new Error("El nombre de usuario no existe.");
+      }
+
+      const account = userSnap.data();
+
+      if (account.passwordHash !== enteredHash) {
+        throw new Error("La contraseña es incorrecta.");
+      }
+
+      const activeSession = { username: account.username, uid: normalizedUsername };
+      localStorage.setItem('cs_active_user', JSON.stringify(activeSession));
+
+      setUser(activeSession);
+      await fetchUserProfile(normalizedUsername, account.username, false);
+      return activeSession;
     }
   };
 
   // Log user out
-  const logoutUser = async () => {
-    trackEvent('auth_logout');
-    if (!demoMode && auth) {
-      await firebaseSignOut(auth);
-    } else {
-      localStorage.removeItem('cs_demo_user');
-      setUser(null);
-      setProfile(null);
-    }
-  };
-
-  // Send password reset
-  const recoverPassword = async (email) => {
-    trackEvent('auth_password_reset_attempt', { email });
-    if (!demoMode && auth) {
-      await sendPasswordResetEmail(auth, email);
-    } else {
-      console.log(`Demo: Password reset email simulated for: ${email}`);
-    }
+  const logoutUser = () => {
+    localStorage.removeItem('cs_active_user');
+    setUser(null);
+    setProfile(null);
   };
 
   // Record an emotional check-in
   const recordMood = async (mood) => {
     if (!profile) return;
-    trackEvent('mood_recorded', { mood });
+    trackEvent('mood_selected', { mood });
 
     const newHistory = [...(profile.moodHistory || [])];
     newHistory.push({ date: new Date().toISOString(), mood });
@@ -320,18 +369,18 @@ export const AuthProvider = ({ children }) => {
       counts[item.mood] = (counts[item.mood] || 0) + 1;
     });
     
-    let frequentMood = profile.frequentMood || 'Relajado';
+    let mostFrequentMood = profile.mostFrequentMood || 'Relajado';
     let maxCount = 0;
     Object.entries(counts).forEach(([m, count]) => {
       if (count > maxCount) {
         maxCount = count;
-        frequentMood = m;
+        mostFrequentMood = m;
       }
     });
 
     const fields = {
       moodHistory: newHistory,
-      frequentMood,
+      mostFrequentMood,
       sessionCount: (profile.sessionCount || 0) + 1
     };
 
@@ -356,7 +405,6 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    // Map game identifier to localized names
     const gameNamesMapping = {
       'zen-garden': 'Jardín Zen',
       'pop-it': 'Pop It Antiestrés',
@@ -373,11 +421,11 @@ export const AuthProvider = ({ children }) => {
       totalTimeSpent: parseFloat(((profile.totalTimeSpent || 0) + timeInMinutes).toFixed(2))
     };
 
-    // Increment breathing count specifically if breathing was played
     if (gameId === 'breathing') {
       fields.breathingSessions = (profile.breathingSessions || 0) + 1;
     }
 
+    trackEvent('session_time', { game: gameId, duration_minutes: timeInMinutes });
     await saveProfileData(fields);
   };
 
@@ -390,7 +438,6 @@ export const AuthProvider = ({ children }) => {
       loginUser,
       registerUser,
       logoutUser,
-      recoverPassword,
       recordMood,
       recordGameSession,
       saveProfileData

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+import { User, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import { trackPageView } from '../analytics/tracking';
 
 const Register = () => {
@@ -11,7 +11,6 @@ const Register = () => {
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,11 +19,6 @@ const Register = () => {
   React.useEffect(() => {
     trackPageView('Register Screen');
   }, []);
-
-  const validateEmail = (val) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(val);
-  };
 
   const isPasswordSecure = (val) => {
     // Requires at least 6 characters and at least one number or special character
@@ -36,16 +30,14 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
-    if (!username) {
+    const trimmedUser = username.trim();
+
+    if (!trimmedUser) {
       setError(language === 'es' ? 'El nombre de usuario es obligatorio.' : 'Username is required.');
       return;
     }
-    if (!email) {
-      setError(language === 'es' ? 'El correo electrónico es obligatorio.' : 'Email is required.');
-      return;
-    }
-    if (!validateEmail(email)) {
-      setError(language === 'es' ? 'Ingresa un correo electrónico válido.' : 'Please enter a valid email.');
+    if (trimmedUser.length < 3) {
+      setError(language === 'es' ? 'El nombre de usuario debe tener al menos 3 caracteres.' : 'Username must be at least 3 characters.');
       return;
     }
     if (!password) {
@@ -65,15 +57,11 @@ const Register = () => {
 
     try {
       setLoading(true);
-      await registerUser(username, email, password);
+      await registerUser(trimmedUser, password);
       navigate('/dashboard');
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError(language === 'es' ? 'El correo electrónico ya está registrado.' : 'Email is already registered.');
-      } else {
-        setError(err.message || (language === 'es' ? 'Error al crear la cuenta.' : 'Failed to create account.'));
-      }
+      setError(err.message || (language === 'es' ? 'Error al crear la cuenta.' : 'Failed to create account.'));
     } finally {
       setLoading(false);
     }
@@ -88,7 +76,7 @@ const Register = () => {
           {t('register')}
         </h2>
         <p className="text-sm font-nunito text-slate-500 dark:text-slate-400 text-center mb-6">
-          {language === 'es' ? 'Comienza tu viaje hacia la calma hoy mismo.' : 'Begin your journey towards calm today.'}
+          {language === 'es' ? 'Crea una cuenta con un nombre de usuario.' : 'Create an account with a username.'}
         </p>
 
         {error && (
@@ -107,26 +95,10 @@ const Register = () => {
               <User className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="zen_peace"
+                placeholder={language === 'es' ? 'usuario_calma' : 'calm_user'}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 font-poppins">
-              {t('email')}
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />
-              <input
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900"
+                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
@@ -142,7 +114,7 @@ const Register = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900"
+                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
@@ -158,7 +130,7 @@ const Register = () => {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900"
+                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
               />
             </div>
           </div>
@@ -166,7 +138,7 @@ const Register = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins"
           >
             <span>{loading ? (language === 'es' ? 'Creando cuenta...' : 'Creating account...') : t('register')}</span>
             <ArrowRight className="w-5 h-5" />
