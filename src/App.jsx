@@ -13,7 +13,7 @@ const Profile = React.lazy(() => import('./pages/Profile'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 
 // Games
-const ZenGarden = React.lazy(() => import('./games/ZenGarden'));
+const SortGame = React.lazy(() => import('./games/SortGame'));
 const PopIt = React.lazy(() => import('./games/PopIt'));
 const Breathing = React.lazy(() => import('./games/Breathing'));
 const Slime = React.lazy(() => import('./games/Slime'));
@@ -109,7 +109,7 @@ function App() {
                 {/* Interactive ASMR Games */}
                 <Route path="/game/zen-garden" element={
                   <ProtectedRoute>
-                    <ZenGarden />
+                    <SortGame />
                   </ProtectedRoute>
                 } />
                 <Route path="/game/pop-it" element={

@@ -7,7 +7,7 @@ import { trackPageView } from '../analytics/tracking';
 
 const Register = () => {
   const { t, language } = useApp();
-  const { registerUser } = useAuth();
+  const { registerUser, loginUser } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -17,6 +17,30 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleQuickRegister = async () => {
+    setError('');
+    try {
+      setLoading(true);
+      // Attempt to register 'Invitado' with password 'invitado123'
+      try {
+        await registerUser('Invitado', 'invitado123');
+      } catch (err) {
+        // If already registered, fall back to logging in as the guest
+        if (err.message.includes('registrado') || err.message.includes('registered') || err.message.includes('existe') || err.message.includes('exist')) {
+          await loginUser('Invitado', 'invitado123');
+        } else {
+          throw err;
+        }
+      }
+      navigate('/dashboard');
+    } catch (err) {
+      console.error(err);
+      setError(language === 'es' ? 'Error al crear cuenta rápida.' : 'Failed to create guest account.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     trackPageView('Register Screen');
@@ -153,18 +177,31 @@ const Register = () => {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins"
-          >
-            <span>{loading ? (language === 'es' ? 'Creando cuenta...' : 'Creating account...') : t('register')}</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins"
+            >
+              <span>{loading ? (language === 'es' ? 'Creando cuenta...' : 'Creating account...') : t('register')}</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleQuickRegister}
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-pastel-rose/85 to-pastel-sky/85 hover:from-pastel-rose hover:to-pastel-sky text-indigo-950 dark:text-indigo-900 font-bold rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins border border-white/20"
+            >
+              <span>⚡ {language === 'es' ? 'Creación de Cuenta Rápida (Demo)' : 'Quick Guest Signup'}</span>
+            </button>
+          </div>
         </form>
 
         <div className="mt-6 pt-6 border-t border-slate-200/30 dark:border-white/5 text-center text-sm font-nunito">
-          <span className="text-slate-500 dark:text-slate-400">{t('already_have_account')} </span>
+          <span className="text-slate-500 dark:text-slate-400">
+            {language === 'es' ? '¿Ya tienes una cuenta? ' : 'Already have an account? '}
+          </span>
           <Link to="/login" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
             {t('login')}
           </Link>

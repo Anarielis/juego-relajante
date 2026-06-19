@@ -26,21 +26,25 @@ const Dashboard = () => {
   const games = [
     {
       id: 'zen-garden',
-      name_es: 'Jardín Zen',
-      name_en: 'Zen Garden',
-      desc_es: 'Dibuja patrones ondulados en la arena, coloca piedras de río y relájate con sonidos naturales.',
-      desc_en: 'Draw wave patterns in the sand, place river rocks, and relax with natural wind sounds.',
+      name_es: 'Organizar Estantes',
+      name_en: 'Shelf Organizing',
+      desc_es: 'Ordena libros, plantas y cristales sobre repisas de madera con chasquidos y sonidos ASMR muy satisfactorios.',
+      desc_en: 'Arrange books, plants, and crystals on wooden shelves with highly satisfying ASMR sounds.',
       color: 'from-pastel-peach-light to-pastel-peach border-pastel-peach-hover',
       svg: (
-        <svg viewBox="0 0 100 100" className="w-full h-full opacity-80 dark:opacity-75">
-          <rect width="100" height="100" fill="#FDF3EE" rx="16" />
-          {/* Sand patterns */}
-          <path d="M 0,20 Q 25,10 50,20 T 100,20 M 0,35 Q 25,25 50,35 T 100,35 M 0,50 Q 25,40 50,50 T 100,50 M 0,65 Q 25,55 50,65 T 100,65 M 0,80 Q 25,70 50,80 T 100,80" fill="none" stroke="#F5DFD5" strokeWidth="1.5" />
-          {/* Zen Rocks */}
-          <ellipse cx="50" cy="50" rx="16" ry="10" fill="#8E8986" />
-          <ellipse cx="48" cy="48" rx="12" ry="7" fill="#AAA5A2" />
-          <ellipse cx="72" cy="62" rx="10" ry="7" fill="#605D5C" />
-          <ellipse cx="30" cy="58" rx="8" ry="5" fill="#4B4948" />
+        <svg viewBox="0 0 100 100" className="w-full h-full opacity-85 dark:opacity-75">
+          <rect width="100" height="100" fill="#FDF7EE" rx="16" />
+          {/* Wooden Shelf */}
+          <rect x="10" y="55" width="80" height="8" rx="2" fill="#8B5A2B" />
+          <rect x="10" y="55" width="80" height="2" fill="#A0522D" />
+          {/* Book */}
+          <rect x="20" y="30" width="10" height="25" rx="1" fill="#F87171" />
+          <rect x="22" y="30" width="3" height="25" fill="#EF4444" />
+          {/* Succulent Plant */}
+          <rect x="42" y="43" width="16" height="12" rx="2" fill="#D1A377" />
+          <path d="M 45,43 C 42,32 48,29 50,43 C 52,29 58,32 55,43" fill="#34D399" />
+          {/* Crystal Gem */}
+          <polygon points="75,32 82,42 75,52 68,42" fill="#C084FC" />
         </svg>
       )
     },

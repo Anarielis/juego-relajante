@@ -109,29 +109,30 @@ class AudioSynthController {
     // Pitch drops very fast (120Hz down to 40Hz)
     const baseFreq = 140 * pitchMultiplier;
     osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.07);
 
-    gainNode.gain.setValueAtTime(0.3, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    // INCREASED GAIN FOR MORE REALISTIC AND LOUDER POP
+    gainNode.gain.setValueAtTime(0.85, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
     osc.connect(gainNode);
     gainNode.connect(this.masterGain);
 
-    // 2. High pass click for crisp attack
+    // 2. High pass click for crisp attack (Tactile snappy click)
     const clickOsc = this.ctx.createOscillator();
     const clickGain = this.ctx.createGain();
     clickOsc.type = 'triangle';
-    clickOsc.frequency.setValueAtTime(1200 * pitchMultiplier, now);
-    clickGain.gain.setValueAtTime(0.05, now);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+    clickOsc.frequency.setValueAtTime(1400 * pitchMultiplier, now);
+    clickGain.gain.setValueAtTime(0.18, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
 
     clickOsc.connect(clickGain);
     clickGain.connect(this.masterGain);
 
     osc.start(now);
-    osc.stop(now + 0.09);
+    osc.stop(now + 0.08);
     clickOsc.start(now);
-    clickOsc.stop(now + 0.03);
+    clickOsc.stop(now + 0.02);
   }
 
   // --- 3. GUIDED BREATHING SOUNDS ---
@@ -353,6 +354,68 @@ class AudioSynthController {
     if (this.ambientGain && this.ctx && this.isAmbientPlaying) {
       this.ambientGain.gain.setValueAtTime(this.ambientVolume, this.ctx.currentTime);
     }
+  }
+
+  // --- 6. ORGANIZING GAME SOUNDS (Wood snap & drag whoosh) ---
+  playWoodSnap() {
+    this.init();
+    if (!this.ctx || !this.enabled) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gainNode = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(300, now);
+
+    gainNode.gain.setValueAtTime(0.75, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
+  playWhoosh(intensity = 0.5) {
+    this.init();
+    if (!this.ctx || !this.enabled) return;
+
+    const now = this.ctx.currentTime;
+    const bufferSize = this.ctx.sampleRate * 0.4; // Short: 0.4s
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noiseSource = this.ctx.createBufferSource();
+    noiseSource.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(300, now);
+    filter.frequency.exponentialRampToValueAtTime(600 * intensity, now + 0.3);
+    filter.Q.value = 1.0;
+
+    const gainNode = this.ctx.createGain();
+    gainNode.gain.setValueAtTime(0.001, now);
+    gainNode.gain.linearRampToValueAtTime(0.035 * intensity, now + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+    noiseSource.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.masterGain);
+
+    noiseSource.start(now);
+    noiseSource.stop(now + 0.4);
   }
 }
 
