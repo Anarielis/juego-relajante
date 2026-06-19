@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Nunito', 'Poppins', sans-serif;
+    scroll-behavior: smooth;
+    transition: background-color 0.5s ease, color 0.3s ease;
+  }
+
+  body {
+    @apply bg-bgLight text-slate-800 dark:bg-bgDark dark:text-slate-100 min-h-screen overflow-x-hidden;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-pastel-lavender/50 dark:bg-pastel-lavender-dark/30 rounded-full hover:bg-pastel-lavender/80;
+}
+
+/* Custom Utility Classes */
+.glass {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+}
+
+.dark .glass {
+  background: rgba(18, 15, 28, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Ambient gradient background helper */
+.gradient-bg {
+  background: linear-gradient(135deg, #FDEEF2 0%, #E8E5F6 50%, #E5F2F9 100%);
+  background-size: 400% 400%;
+}
+
+.dark .gradient-bg {
+  background: linear-gradient(135deg, #231320 0%, #151026 50%, #0E1624 100%);
+  background-size: 400% 400%;
+}
+
+/* Hide canvas outline */
+canvas {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
