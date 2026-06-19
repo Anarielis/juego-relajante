@@ -2,19 +2,45 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Lock, AlertCircle, ArrowRight, Info } from 'lucide-react';
+import { User, Lock, AlertCircle, ArrowRight, Info, Eye, EyeOff } from 'lucide-react';
 import { trackPageView } from '../analytics/tracking';
 
 const Login = () => {
   const { t, language } = useApp();
-  const { loginUser } = useAuth();
+  const { loginUser, registerUser } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [showRecoveryInfo, setShowRecoveryInfo] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleQuickLogin = async () => {
+    setError('');
+    setShowRecoveryInfo(false);
+    try {
+      setLoading(true);
+      // Try logging in with the default guest account 'invitado'
+      try {
+        await loginUser('Invitado', 'invitado123');
+      } catch (err) {
+        // If the account does not exist in the database, automatically register it first
+        if (err.message.includes('existe') || err.message.includes('exist')) {
+          await registerUser('Invitado', 'invitado123');
+        } else {
+          throw err;
+        }
+      }
+      navigate('/dashboard');
+    } catch (err) {
+      console.error(err);
+      setError(language === 'es' ? 'Error al iniciar sesión rápida.' : 'Failed to log in quickly.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     trackPageView('Login Screen');
@@ -100,12 +126,20 @@ const Login = () => {
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
+                className="w-full pl-11 pr-12 py-3 bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 rounded-xl font-nunito focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40 focus:border-indigo-300 dark:focus:border-indigo-900 text-slate-800 dark:text-slate-100"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
           </div>
 
@@ -119,14 +153,25 @@ const Login = () => {
             </button>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins"
-          >
-            <span>{loading ? (language === 'es' ? 'Iniciando...' : 'Logging in...') : t('login')}</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins"
+            >
+              <span>{loading ? (language === 'es' ? 'Iniciando...' : 'Logging in...') : t('login')}</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleQuickLogin}
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-pastel-rose/85 to-pastel-sky/85 hover:from-pastel-rose hover:to-pastel-sky text-indigo-950 dark:text-indigo-900 font-bold rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed font-poppins border border-white/20"
+            >
+              <span>⚡ {language === 'es' ? 'Acceso Rápido (Demo)' : 'Quick Guest Login'}</span>
+            </button>
+          </div>
         </form>
 
         <div className="mt-6 pt-6 border-t border-slate-200/30 dark:border-white/5 text-center text-sm font-nunito">
