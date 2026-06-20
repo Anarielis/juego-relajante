@@ -87,11 +87,21 @@ const Breathing = () => {
   }, [playTime]);
 
   const activeSequence = BREATHING_MODES[activeMode].sequence;
-  const currentStep = activeSequence[stepIndex];
+  
+  // Safety guard: fallback to step 0 if stepIndex is temporarily out of bounds
+  const currentStep = activeSequence[stepIndex] || activeSequence[0];
+
+  // Reset steps and stop playing when switching breathing modes to prevent crashes
+  useEffect(() => {
+    setStepIndex(0);
+    setSecondsRemaining(0);
+    setIsPlaying(false);
+    cleanupSounds();
+  }, [activeMode]);
 
   // Core guided breathing loop state machine
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying || !currentStep) {
       cleanupSounds();
       return;
     }

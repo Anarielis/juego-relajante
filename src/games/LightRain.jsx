@@ -1,22 +1,26 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, RefreshCw, HelpCircle, Sparkles, Edit3, Heart } from 'lucide-react';
+import { ArrowLeft, RefreshCw, HelpCircle, Sparkles, Paintbrush, Check } from 'lucide-react';
 import audioSynth from '../utils/audioSynth';
 import { trackPageView } from '../analytics/tracking';
 
+// 7 Gorgeous Relaxing Pastel/Neon Colors
 const COLOR_PALETTE = [
-  { id: 'emerald', label_es: 'Esmeralda', label_en: 'Emerald', hex: '#10B981', hsl: 'hsla(150, 100%, 70%, opacity)' },
-  { id: 'amethyst', label_es: 'Amatista', label_en: 'Amethyst', hex: '#A855F7', hsl: 'hsla(270, 100%, 75%, opacity)' },
-  { id: 'gold', label_es: 'Oro', label_en: 'Gold', hex: '#F59E0B', hsl: 'hsla(45, 100%, 65%, opacity)' },
-  { id: 'rose', label_es: 'Rosa Coral', label_en: 'Rose Coral', hex: '#F43F5E', hsl: 'hsla(345, 100%, 70%, opacity)' }
+  { id: 'rose', label_es: 'Rosa Coral', label_en: 'Coral Pink', hex: '#F43F5E', hsl: 'hsla(345, 100%, 70%, 1.0)' },
+  { id: 'orange', label_es: 'Naranja Atardecer', label_en: 'Sunset Orange', hex: '#FB923C', hsl: 'hsla(25, 95%, 65%, 1.0)' },
+  { id: 'gold', label_es: 'Oro Brillante', label_en: 'Bright Gold', hex: '#F59E0B', hsl: 'hsla(45, 100%, 60%, 1.0)' },
+  { id: 'emerald', label_es: 'Verde Esmeralda', label_en: 'Emerald Green', hex: '#10B981', hsl: 'hsla(150, 100%, 65%, 1.0)' },
+  { id: 'sky', label_es: 'Azul Cielo', label_en: 'Sky Blue', hex: '#38BDF8', hsl: 'hsla(195, 95%, 65%, 1.0)' },
+  { id: 'amethyst', label_es: 'Violeta Amatista', label_en: 'Amethyst Purple', hex: '#A855F7', hsl: 'hsla(270, 100%, 70%, 1.0)' },
+  { id: 'white', label_es: 'Blanco Zen', label_en: 'Zen White', hex: '#F8FAFC', hsl: 'hsla(210, 120%, 98%, 1.0)' }
 ];
 
 const TEMPLATES = [
-  { id: 'free', label_es: 'Lienzo Libre', label_en: 'Free Canvas', desc_es: 'Dibuja con total libertad sobre un lienzo oscuro.', desc_en: 'Paint with complete freedom on a dark canvas.' },
-  { id: 'mandala', label_es: 'Mandala Zen', label_en: 'Zen Mandala', desc_es: 'Colorea las líneas concéntricas de un mandala simétrico.', desc_en: 'Color the concentric lines of a symmetric mandala.' },
-  { id: 'lotus', label_es: 'Flor de Loto', label_en: 'Lotus Flower', desc_es: 'Colorea una sagrada flor de loto en su estanque.', desc_en: 'Color a sacred lotus flower sitting in its pond.' }
+  { id: 'mandala', label_es: 'Mandala Zen', label_en: 'Zen Mandala', desc_es: 'Colorea pétalos y círculos simétricos concéntricos.', desc_en: 'Color symmetrical concentric circles and flower petals.' },
+  { id: 'lotus', label_es: 'Flor de Loto', label_en: 'Lotus Flower', desc_es: 'Colorea pétalos sobre un estanque bajo el sol.', desc_en: 'Color overlapping petals on a quiet pond under the sun.' },
+  { id: 'sunset', label_es: 'Atardecer Zen', label_en: 'Zen Sunset', desc_es: 'Colorea el cielo, las montañas y el agua de meditación.', desc_en: 'Color the sky, mountains, and meditation water ripples.' }
 ];
 
 const LightRain = () => {
@@ -24,335 +28,92 @@ const LightRain = () => {
   const { recordGameSession } = useAuth();
   const navigate = useNavigate();
 
-  const canvasRef = useRef(null);
-  const containerRef = useRef(null);
-
-  const [activeColor, setActiveColor] = useState('emerald');
-  const [activeTemplate, setActiveTemplate] = useState('free');
-  const [brushSize, setBrushSize] = useState(6);
+  const [activeTemplate, setActiveTemplate] = useState('mandala');
+  const [activeColor, setActiveColor] = useState('rose');
+  const [coloredRegions, setColoredRegions] = useState({});
   const [playTime, setPlayTime] = useState(0);
-  const [strokeCount, setStrokeCount] = useState(0);
   const [showInstructions, setShowInstructions] = useState(true);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [sparkles, setSparkles] = useState([]);
 
-  const splashesRef = useRef([]); // Click ripples and sparkles
-  const strokesRef = useRef([]); // Persistent drawings
-  const activeStrokeRef = useRef(null);
-
-  const mouseRef = useRef({ x: 0, y: 0, active: false, prevX: 0, lastActiveTime: 0 });
-  const animationFrameId = useRef(null);
-
-  const activeColorRef = useRef(activeColor);
-  const activeTemplateRef = useRef(activeTemplate);
-
+  // Time tracking
   useEffect(() => {
-    activeColorRef.current = activeColor;
-    activeTemplateRef.current = activeTemplate;
-  }, [activeColor, activeTemplate]);
-
-  // Tracking and session timing
-  useEffect(() => {
-    trackPageView('Coloring Book Game');
+    trackPageView('Zen Coloring Game');
     const interval = setInterval(() => {
       setPlayTime(prev => prev + 1);
     }, 1000);
     return () => {
       clearInterval(interval);
-      recordGameSession('light-rain', playTime); // Stored under 'light-rain' key for consistency
-      cancelAnimationFrame(animationFrameId.current);
+      recordGameSession('light-rain', playTime);
     };
   }, [playTime]);
 
-  // Setup Canvas and rendering loop
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+  const handleRegionClick = (regionId) => {
+    if (isCompleted) return;
 
-    const resizeCanvas = () => {
-      const rect = containerRef.current?.getBoundingClientRect() || { width: 600, height: 450 };
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    splashesRef.current = [];
-    strokesRef.current = [];
-
-    const tick = () => {
-      const width = parseFloat(canvas.style.width) || canvas.width;
-      const height = parseFloat(canvas.style.height) || canvas.height;
-      const tId = activeTemplateRef.current;
-      const colorObj = COLOR_PALETTE.find(c => c.id === activeColorRef.current) || COLOR_PALETTE[0];
-
-      // Draw background (slight alpha overlay for faint light trail blends)
-      ctx.fillStyle = 'rgba(10, 8, 22, 0.16)';
-      ctx.fillRect(0, 0, width, height);
-
-      // Render outlines of the chosen templates
-      if (tId !== 'free') {
-        drawTemplateBackground(ctx, width, height, tId);
-      }
-
-      ctx.globalCompositeOperation = 'lighter';
-
-      // 1. Draw Persistent custom painting strokes
-      strokesRef.current.forEach(stroke => {
-        if (stroke.points.length < 2) return;
-        ctx.beginPath();
-        ctx.strokeStyle = stroke.color;
-        ctx.lineWidth = stroke.size;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        // Add neon glow shadow
-        ctx.shadowBlur = stroke.size * 1.6;
-        ctx.shadowColor = stroke.color;
-        
-        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        for (let i = 1; i < stroke.points.length; i++) {
-          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0; // reset
-      });
-
-      // 2. Draw active click/drag sparkles and ripples
-      for (let i = splashesRef.current.length - 1; i >= 0; i--) {
-        const s = splashesRef.current[i];
-        s.x += s.vx || 0;
-        s.y += s.vy || 0;
-        s.alpha -= s.decay || 0.02;
-
-        if (s.alpha <= 0) {
-          splashesRef.current.splice(i, 1);
-          continue;
-        }
-
-        ctx.beginPath();
-        if (s.type === 'ripple') {
-          s.radius += s.speed || 1.2;
-          ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
-          ctx.strokeStyle = s.color.replace('opacity', s.alpha);
-          ctx.lineWidth = 1.3;
-          ctx.stroke();
-        } else {
-          ctx.arc(s.x, s.y, s.size || 1.5, 0, Math.PI * 2);
-          ctx.fillStyle = s.color.replace('opacity', s.alpha);
-          ctx.fill();
-        }
-      }
-
-      // 3. Draw subtle cursor indicator spot
-      if (mouseRef.current.active) {
-        ctx.beginPath();
-        const grad = ctx.createRadialGradient(mouseRef.current.x, mouseRef.current.y, 0, mouseRef.current.x, mouseRef.current.y, 35);
-        grad.addColorStop(0, colorObj.hsl.replace('opacity', 0.2));
-        grad.addColorStop(1, colorObj.hsl.replace('opacity', 0));
-        ctx.fillStyle = grad;
-        ctx.arc(mouseRef.current.x, mouseRef.current.y, 35, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.globalCompositeOperation = 'source-over';
-
-      animationFrameId.current = requestAnimationFrame(tick);
-    };
-
-    tick();
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas);
-      cancelAnimationFrame(animationFrameId.current);
-    };
-  }, []);
-
-  // Guidelines outlines for Mandalas or Lotus Flower template
-  const drawTemplateBackground = (ctx, width, height, type) => {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.09)';
-    ctx.lineWidth = 1.3;
-    const cx = width / 2;
-    const cy = height / 2;
-
-    if (type === 'mandala') {
-      // Concentric circles
-      for (let r = 25; r <= 150; r += 25) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      // Symmetric ray guide lines
-      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15);
-        ctx.lineTo(cx + Math.cos(a) * 165, cy + Math.sin(a) * 165);
-        ctx.stroke();
-      }
-      // Mandala details / petals
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.ellipse(cx + Math.cos(a) * 55, cy + Math.sin(a) * 55, 25, 14, a, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    } else if (type === 'lotus') {
-      // Center Bud
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + 15, 22, 48, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // Overlapping petals
-      for (let side = -1; side <= 1; side += 2) {
-        ctx.beginPath();
-        ctx.ellipse(cx + side * 28, cy + 20, 20, 44, side * 0.35, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.ellipse(cx + side * 52, cy + 28, 16, 35, side * 0.75, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.ellipse(cx + side * 70, cy + 42, 12, 28, side * 1.1, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      // Floating pond ring
-      ctx.beginPath();
-      ctx.ellipse(cx, cy + 68, 80, 12, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-  };
-
-  // Touch and pointer drawing mechanics
-  const handlePointerDown = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    const mx = clientX - rect.left;
-    const my = clientY - rect.top;
-
-    mouseRef.current.x = mx;
-    mouseRef.current.y = my;
-    mouseRef.current.active = true;
-
-    // Start new stroke
-    const colorObj = COLOR_PALETTE.find(c => c.id === activeColor) || COLOR_PALETTE[0];
-    const newStroke = {
-      color: colorObj.hex,
-      size: brushSize,
-      points: [{ x: mx, y: my }]
-    };
+    const selectedColorObj = COLOR_PALETTE.find(c => c.id === activeColor) || COLOR_PALETTE[0];
     
-    strokesRef.current.push(newStroke);
-    activeStrokeRef.current = newStroke;
-    setStrokeCount(strokesRef.current.length);
+    // Play relaxing brush sweep + crystal chime sound
+    audioSynth.playZenScratch(0.4);
+    audioSynth.playRaindropChime(0.8 + Math.random() * 0.4);
 
-    // Play scratch brush sound
-    audioSynth.playZenScratch(0.35);
+    setColoredRegions(prev => {
+      const next = { ...prev, [regionId]: selectedColorObj.hex };
+      
+      // Check if template is fully colored
+      checkCompletion(next);
 
-    // Play drop chime based on height
-    const normalizedY = 1.0 - (my / rect.height);
-    audioSynth.playRaindropChime(0.6 + normalizedY * 0.8);
-    spawnClickRipples(mx, my, colorObj.hsl);
-  };
-
-  const handlePointerMove = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    const mx = clientX - rect.left;
-    const my = clientY - rect.top;
-
-    mouseRef.current.x = mx;
-    mouseRef.current.y = my;
-    mouseRef.current.active = true;
-
-    if (activeStrokeRef.current) {
-      activeStrokeRef.current.points.push({ x: mx, y: my });
-
-      // Scratch brush sound playing intermittently to sound realistic
-      if (Math.random() > 0.88) {
-        audioSynth.playZenScratch(0.18);
-      }
-
-      // Spawn soft movement sparkles
-      if (Math.random() > 0.6) {
-        const colorObj = COLOR_PALETTE.find(c => c.id === activeColor) || COLOR_PALETTE[0];
-        splashesRef.current.push({
-          id: Math.random(),
-          type: 'spark',
-          x: mx + (Math.random() - 0.5) * 8,
-          y: my + (Math.random() - 0.5) * 8,
-          vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5,
-          size: Math.random() * 1.5 + 0.8,
-          alpha: 0.8,
-          decay: 0.04,
-          color: colorObj.hsl
-        });
-      }
-    }
-  };
-
-  const handlePointerUp = () => {
-    mouseRef.current.active = false;
-    activeStrokeRef.current = null;
-  };
-
-  const spawnClickRipples = (x, y, hslColor) => {
-    // Spawn ripple ring
-    splashesRef.current.push({
-      id: Math.random(),
-      type: 'ripple',
-      x,
-      y,
-      radius: 2,
-      maxRadius: 35,
-      alpha: 1.0,
-      speed: 1.6,
-      color: hslColor
+      return next;
     });
+  };
 
-    // Spawn sparks
-    for (let i = 0; i < 8; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 1.8 + 0.5;
-      splashesRef.current.push({
-        id: Math.random(),
-        type: 'spark',
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        size: Math.random() * 2 + 1,
-        alpha: 1.0,
-        decay: 0.035,
-        color: hslColor
-      });
+  const checkCompletion = (regionsMap) => {
+    let totalRegions = 0;
+
+    if (activeTemplate === 'mandala') {
+      totalRegions = 1 + 8 + 8; // center + 8 inner + 8 outer
+    } else if (activeTemplate === 'lotus') {
+      totalRegions = 1 + 2 + 2 + 3 + 1; // center + 2 inner + 2 outer + 3 waves + 1 sun
+    } else if (activeTemplate === 'sunset') {
+      totalRegions = 3 + 1 + 2 + 1; // 3 sky + 1 sun + 2 mountains + 1 water
+    }
+
+    const coloredCount = Object.keys(regionsMap).filter(key => key.startsWith(activeTemplate) && regionsMap[key]).length;
+
+    if (coloredCount >= totalRegions) {
+      triggerVictory();
     }
   };
 
-  // Completely clears all persistent drawings and visual feedback
-  const handleFullReset = () => {
-    strokesRef.current = [];
-    splashesRef.current = [];
-    setStrokeCount(0);
-    activeStrokeRef.current = null;
-    audioSynth.playBreathingBell(); // Soothing bell sound feedback
+  const triggerVictory = () => {
+    setIsCompleted(true);
+    audioSynth.playBreathingBell();
+
+    const newSparkles = Array.from({ length: 25 }).map((_, idx) => ({
+      id: idx,
+      x: 10 + Math.random() * 80,
+      y: 10 + Math.random() * 80,
+      size: Math.random() * 12 + 8,
+      delay: Math.random() * 0.7
+    }));
+    setSparkles(newSparkles);
   };
 
-  const selectedTemplateDetails = TEMPLATES.find(t => t.id === activeTemplate) || TEMPLATES[0];
+  const handleReset = () => {
+    setColoredRegions({});
+    setIsCompleted(false);
+    setSparkles([]);
+    audioSynth.playBreathingBell();
+  };
+
+  // Reset completion state when switching template
+  useEffect(() => {
+    setIsCompleted(false);
+    setSparkles([]);
+  }, [activeTemplate]);
+
+  const selectedTemplate = TEMPLATES.find(t => t.id === activeTemplate) || TEMPLATES[0];
+  const activeColorHex = COLOR_PALETTE.find(c => c.id === activeColor)?.hex || '#F43F5E';
 
   return (
     <div className="flex-1 flex flex-col space-y-4 select-none">
@@ -367,25 +128,14 @@ const LightRain = () => {
           <span>{t('welcome_title')}</span>
         </button>
 
-        {/* Counter and Full Reset button */}
-        <div className="flex items-center space-x-2">
-          {strokeCount > 0 && (
-            <div className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 font-nunito font-semibold mr-1">
-              <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>{language === 'es' ? 'Trazos' : 'Strokes'}:</span>
-              <span className="text-slate-800 dark:text-slate-200 font-bold font-poppins">{strokeCount}</span>
-            </div>
-          )}
-
-          <button
-            onClick={handleFullReset}
-            className="p-2 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition-all flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider font-poppins active:scale-95 pointer-events-auto shadow-sm"
-            title={language === 'es' ? 'Limpiar Lienzo' : 'Clear Canvas'}
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span>{language === 'es' ? 'Reiniciar' : 'Reset'}</span>
-          </button>
-        </div>
+        <button
+          onClick={handleReset}
+          className="p-2 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition-all flex items-center space-x-1.5 text-xs font-bold uppercase tracking-wider font-poppins active:scale-95 shadow-sm"
+          title={language === 'es' ? 'Limpiar Lienzo' : 'Clear Canvas'}
+        >
+          <RefreshCw className="w-4 h-4 animate-spin-hover" />
+          <span>{language === 'es' ? 'Reiniciar' : 'Reset'}</span>
+        </button>
       </div>
 
       {/* Guide details bubble */}
@@ -393,12 +143,12 @@ const LightRain = () => {
         <div className="glass p-4 rounded-2xl border border-white/20 dark:border-white/5 text-xs md:text-sm font-nunito text-slate-600 dark:text-slate-300 leading-relaxed flex justify-between items-start">
           <div>
             <p className="font-bold font-poppins text-slate-800 dark:text-slate-100 mb-1">
-              {language === 'es' ? 'Lienzo de Dibujo Zen' : 'Zen Coloring Canvas'}
+              {language === 'es' ? 'Lienzo de Colorear Zen' : 'Zen Coloring Canvas'}
             </p>
             <p>
               {language === 'es'
-                ? 'Colorea las líneas guía seleccionando colores de neón de la paleta. Arrastra tu dedo o ratón para pintar y escucha los sonidos ASMR de cepillo y campana cristalina.'
-                : 'Color the guide outlines by selecting neon paint from the palette. Drag your finger or mouse to draw and listen to the relaxing ASMR brush and bell chimes.'}
+                ? 'Selecciona un color de neón de la paleta y haz clic en las diferentes secciones del dibujo para colorearlas. Llena todos los espacios para completar la armonía.'
+                : 'Select a neon paint color from the palette, and tap the regions of the drawing to color them. Fill all spaces to complete the harmony.'}
             </p>
           </div>
           <button 
@@ -410,49 +160,316 @@ const LightRain = () => {
         </div>
       )}
 
-      {/* Main Canvas Container */}
-      <div 
-        ref={containerRef}
-        className="flex-1 min-h-[380px] bg-[#080612] rounded-3xl overflow-hidden relative border border-slate-900 shadow-2xl"
-      >
-        <canvas
-          ref={canvasRef}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
-          onMouseLeave={handlePointerUp}
-          onTouchStart={handlePointerDown}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
-          className="absolute inset-0 w-full h-full block touch-none cursor-crosshair"
-        />
+      {/* Main Drawing Sandbox Board */}
+      <div className="flex-1 bg-[#0A0716] rounded-3xl p-6 relative border border-slate-900 shadow-2xl flex flex-col items-center justify-center min-h-[420px] overflow-hidden">
+        
+        {/* Victory Sparkles Overlay */}
+        {isCompleted && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
+            {sparkles.map(sp => (
+              <span
+                key={sp.id}
+                className="absolute text-yellow-400 dark:text-amber-300 font-bold leading-none animate-ping"
+                style={{
+                  left: `${sp.x}%`,
+                  top: `${sp.y}%`,
+                  fontSize: `${sp.size}px`,
+                  animationDuration: '2s',
+                  animationDelay: `${sp.delay}s`
+                }}
+              >
+                ✦
+              </span>
+            ))}
+            
+            {/* Victory banner */}
+            <div className="absolute top-[45%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-indigo-200/50 shadow-2xl text-center max-w-sm pointer-events-auto">
+              <Sparkles className="w-10 h-10 text-amber-500 mx-auto mb-2 animate-bounce" />
+              <h3 className="text-xl font-bold font-poppins text-slate-800 dark:text-slate-100">
+                {language === 'es' ? '¡Lienzo Completado!' : 'Art Completed!'}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-nunito mt-1">
+                {language === 'es' ? 'Siente la paz de haber llenado el espacio con color y armonía.' : 'Feel the peace of having filled the canvas with color and harmony.'}
+              </p>
+              <button
+                onClick={handleReset}
+                className="mt-4 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all duration-150 font-poppins"
+              >
+                {language === 'es' ? 'Colorear de Nuevo' : 'Color Again'}
+              </button>
+            </div>
+          </div>
+        )}
 
-        {/* Floating details mode bubble */}
+        {/* Floating guidance label */}
         <div className="absolute top-4 left-4 p-2.5 px-4 rounded-2xl bg-slate-950/70 backdrop-blur-md border border-white/5 pointer-events-none text-xs text-slate-300 font-nunito flex items-center space-x-2 shadow-md">
-          <Edit3 className="w-4 h-4 text-indigo-400 animate-pulse" />
+          <Paintbrush className="w-4 h-4 text-indigo-400" />
           <div>
             <span className="font-bold text-2xs uppercase tracking-wider font-poppins text-white block">
-              {language === 'es' ? 'Lienzo Zen de Pintura' : 'Zen Paint Canvas'}
+              {language === 'es' ? selectedTemplate.label_es : selectedTemplate.label_en}
             </span>
             <span className="text-3xs text-slate-400 block">
-              {language === 'es' ? selectedTemplateDetails.desc_es : selectedTemplateDetails.desc_en}
+              {language === 'es' ? selectedTemplate.desc_es : selectedTemplate.desc_en}
             </span>
           </div>
         </div>
 
-        {/* Soft help overlay */}
-        <div className="absolute bottom-4 right-4 p-2 px-3 rounded-lg bg-white/5 dark:bg-slate-950/40 border border-white/5 pointer-events-none text-3xs font-semibold text-slate-400 uppercase tracking-widest font-poppins">
-          {language === 'es' ? 'Colorea con tu dedo' : 'Color with your finger'}
+        {/* SVG Drawing Canvas Rendering */}
+        <div className="w-72 h-72 md:w-[360px] md:h-[360px] p-2 bg-slate-950/40 rounded-2xl border border-white/5 flex items-center justify-center relative">
+          
+          {/* 1. MANDALA ZEN SVG */}
+          {activeTemplate === 'mandala' && (
+            <svg viewBox="0 0 200 200" className="w-full h-full">
+              {/* Outer corner frame guides */}
+              <rect x="5" y="5" width="190" height="190" rx="10" fill="none" stroke="#251E3E" strokeWidth="1" />
+              
+              {/* 8 Outer diamond petals */}
+              {[22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5].map((angle, idx) => {
+                const regionId = `mandala-petalo-${idx}`;
+                return (
+                  <path
+                    key={regionId}
+                    id={regionId}
+                    d="M 100 100 L 76 42 L 100 10 L 124 42 Z"
+                    transform={`rotate(${angle}, 100, 100)`}
+                    fill={coloredRegions[regionId] || '#0D091F'}
+                    stroke="#4F46E5"
+                    strokeWidth="1.2"
+                    className="cursor-pointer transition-all duration-300 hover:opacity-80 active:scale-[0.99]"
+                    onClick={() => handleRegionClick(regionId)}
+                  />
+                );
+              })}
+
+              {/* 8 Inner rounded leaf petals */}
+              {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, idx) => {
+                const regionId = `mandala-petali-${idx}`;
+                return (
+                  <path
+                    key={regionId}
+                    id={regionId}
+                    d="M 100 82 C 86 68, 86 52, 100 38 C 114 52, 114 68, 100 82 Z"
+                    transform={`rotate(${angle}, 100, 100)`}
+                    fill={coloredRegions[regionId] || '#150F30'}
+                    stroke="#818CF8"
+                    strokeWidth="1.2"
+                    className="cursor-pointer transition-all duration-300 hover:opacity-80 active:scale-[0.99]"
+                    onClick={() => handleRegionClick(regionId)}
+                  />
+                );
+              })}
+
+              {/* Center sacred circle */}
+              <circle
+                id="mandala-center"
+                cx="100"
+                cy="100"
+                r="18"
+                fill={coloredRegions['mandala-center'] || '#1E1B4B'}
+                stroke="#C084FC"
+                strokeWidth="1.8"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80 active:scale-[0.99]"
+                onClick={() => handleRegionClick('mandala-center')}
+              />
+            </svg>
+          )}
+
+          {/* 2. FLOR DE LOTO SVG */}
+          {activeTemplate === 'lotus' && (
+            <svg viewBox="0 0 200 200" className="w-full h-full">
+              {/* Outer border circular frame */}
+              <circle cx="100" cy="100" r="95" fill="none" stroke="#251E3E" strokeWidth="1" />
+              
+              {/* Sun in the background */}
+              <circle
+                id="lotus-sun"
+                cx="100"
+                cy="45"
+                r="18"
+                fill={coloredRegions['lotus-sun'] || '#0D091F'}
+                stroke="#C084FC"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-sun')}
+              />
+
+              {/* Water waves in the bottom */}
+              <path
+                id="lotus-wave-l"
+                d="M 20 162 C 45 152, 70 152, 100 162 L 100 185 L 20 185 Z"
+                fill={coloredRegions['lotus-wave-l'] || '#0D091F'}
+                stroke="#4F46E5"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-wave-l')}
+              />
+              <path
+                id="lotus-wave-r"
+                d="M 100 162 C 130 152, 155 152, 180 162 L 180 185 L 100 185 Z"
+                fill={coloredRegions['lotus-wave-r'] || '#0D091F'}
+                stroke="#4F46E5"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-wave-r')}
+              />
+              <path
+                id="lotus-wave-c"
+                d="M 50 168 C 75 160, 125 160, 150 168 L 150 190 L 50 190 Z"
+                fill={coloredRegions['lotus-wave-c'] || '#150F30'}
+                stroke="#818CF8"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-wave-c')}
+              />
+
+              {/* Lotus Left Outer Petal */}
+              <path
+                id="lotus-left-o"
+                d="M 100 150 C 45 130, 48 100, 60 80 C 78 100, 92 130, 100 150 Z"
+                fill={coloredRegions['lotus-left-o'] || '#0F0A26'}
+                stroke="#6366F1"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-left-o')}
+              />
+              {/* Lotus Right Outer Petal */}
+              <path
+                id="lotus-right-o"
+                d="M 100 150 C 108 130, 122 100, 140 80 C 152 100, 155 130, 100 150 Z"
+                fill={coloredRegions['lotus-right-o'] || '#0F0A26'}
+                stroke="#6366F1"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-right-o')}
+              />
+
+              {/* Lotus Left Inner Petal */}
+              <path
+                id="lotus-left-i"
+                d="M 100 150 C 68 118, 68 82, 80 60 C 92 82, 98 118, 100 150 Z"
+                fill={coloredRegions['lotus-left-i'] || '#160F35'}
+                stroke="#818CF8"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-left-i')}
+              />
+              {/* Lotus Right Inner Petal */}
+              <path
+                id="lotus-right-i"
+                d="M 100 150 C 102 118, 108 82, 120 60 C 132 82, 132 118, 100 150 Z"
+                fill={coloredRegions['lotus-right-i'] || '#160F35'}
+                stroke="#818CF8"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-right-i')}
+              />
+
+              {/* Lotus Center Main Petal */}
+              <path
+                id="lotus-center"
+                d="M 100 150 C 82 105, 82 65, 100 42 C 118 65, 118 105, 100 150 Z"
+                fill={coloredRegions['lotus-center'] || '#1E1B4B'}
+                stroke="#C084FC"
+                strokeWidth="1.4"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('lotus-center')}
+              />
+            </svg>
+          )}
+
+          {/* 3. ZEN SUNSET SVG */}
+          {activeTemplate === 'sunset' && (
+            <svg viewBox="0 0 200 200" className="w-full h-full">
+              {/* Boundary frame */}
+              <rect x="5" y="5" width="190" height="190" rx="10" fill="none" stroke="#251E3E" strokeWidth="1" />
+
+              {/* Sky segment 1 (Top) */}
+              <path
+                id="sunset-sky-t"
+                d="M 10 10 L 190 10 L 190 50 L 10 50 Z"
+                fill={coloredRegions['sunset-sky-t'] || '#080516'}
+                stroke="#4F46E5"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('sunset-sky-t')}
+              />
+              {/* Sky segment 2 (Middle) */}
+              <path
+                id="sunset-sky-m"
+                d="M 10 50 L 190 50 L 190 90 L 10 90 Z"
+                fill={coloredRegions['sunset-sky-m'] || '#0B071E'}
+                stroke="#4F46E5"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('sunset-sky-m')}
+              />
+              {/* Sky segment 3 (Bottom) */}
+              <path
+                id="sunset-sky-b"
+                d="M 10 90 L 190 90 L 190 130 L 10 130 Z"
+                fill={coloredRegions['sunset-sky-b'] || '#0F0B28'}
+                stroke="#4F46E5"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('sunset-sky-b')}
+              />
+
+              {/* Sun in center horizon */}
+              <path
+                id="sunset-sun"
+                d="M 70 130 C 70 95, 130 95, 130 130 Z"
+                fill={coloredRegions['sunset-sun'] || '#1A1235'}
+                stroke="#C084FC"
+                strokeWidth="1.4"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('sunset-sun')}
+              />
+
+              {/* Left Mountain */}
+              <path
+                id="sunset-mountain-l"
+                d="M 10 160 L 65 95 L 120 160 Z"
+                fill={coloredRegions['sunset-mountain-l'] || '#120D2C'}
+                stroke="#6366F1"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-85"
+                onClick={() => handleRegionClick('sunset-mountain-l')}
+              />
+              {/* Right Mountain */}
+              <path
+                id="sunset-mountain-r"
+                d="M 80 160 L 140 85 L 190 160 Z"
+                fill={coloredRegions['sunset-mountain-r'] || '#16113A'}
+                stroke="#6366F1"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-85"
+                onClick={() => handleRegionClick('sunset-mountain-r')}
+              />
+
+              {/* Foreground Water panel */}
+              <path
+                id="sunset-water"
+                d="M 10 160 L 190 160 L 190 190 L 10 190 Z"
+                fill={coloredRegions['sunset-water'] || '#1D1A3F'}
+                stroke="#818CF8"
+                strokeWidth="1.2"
+                className="cursor-pointer transition-all duration-300 hover:opacity-80"
+                onClick={() => handleRegionClick('sunset-water')}
+              />
+            </svg>
+          )}
+
         </div>
+
       </div>
 
       {/* Control Drawer Footer */}
       <div className="glass p-4 rounded-3xl border border-white/20 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 font-nunito shadow-sm">
         
-        {/* Template selector tab options */}
+        {/* Template Selectors */}
         <div className="flex flex-col gap-1.5 w-full md:w-auto">
           <span className="text-3xs text-slate-400 font-bold uppercase tracking-wider font-poppins block px-1">
-            {language === 'es' ? 'Plantillas Zen' : 'Zen Outlines'}
+            {language === 'es' ? 'Elige un Dibujo' : 'Choose a Drawing'}
           </span>
           <div className="flex items-center space-x-1.5">
             {TEMPLATES.map((temp) => (
@@ -462,10 +479,10 @@ const LightRain = () => {
                   setActiveTemplate(temp.id);
                   audioSynth.playPopSound(0.95);
                 }}
-                className={`px-3 py-2 text-2xs font-bold rounded-xl border transition-all ${
+                className={`px-3.5 py-2 text-2xs font-bold rounded-xl border transition-all ${
                   activeTemplate === temp.id
-                    ? 'bg-indigo-600 text-white border-transparent shadow-sm'
-                    : 'bg-white/40 dark:bg-white/5 border-slate-200/50 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80'
+                    ? 'bg-indigo-600 text-white border-transparent shadow'
+                    : 'bg-white/40 dark:bg-white/5 border-slate-200/50 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10'
                 }`}
               >
                 {language === 'es' ? temp.label_es : temp.label_en}
@@ -474,50 +491,36 @@ const LightRain = () => {
           </div>
         </div>
 
-        {/* Brush options drawer (colors and size) */}
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto justify-end">
-          
-          {/* Color palette */}
+        {/* Colors Selection Palette */}
+        <div className="flex flex-col gap-1.5 w-full md:w-auto items-end justify-end">
+          <span className="text-3xs text-slate-400 font-bold uppercase tracking-wider font-poppins block w-full text-right px-1">
+            {language === 'es' ? 'Paleta de Pintura' : 'Paint Palette'}
+          </span>
           <div className="flex items-center space-x-2">
-            <span className="text-3xs text-slate-400 font-bold uppercase font-poppins">
-              {language === 'es' ? 'Colores' : 'Paints'}:
-            </span>
-            <div className="flex items-center space-x-2">
-              {COLOR_PALETTE.map((color) => (
+            {COLOR_PALETTE.map((color) => {
+              const isSelected = activeColor === color.id;
+              return (
                 <button
                   key={color.id}
                   onClick={() => {
                     setActiveColor(color.id);
-                    audioSynth.playPopSound(1.35);
+                    audioSynth.playPopSound(1.3);
                   }}
-                  className={`w-6 h-6 rounded-full border transition-all duration-150 transform hover:scale-105 active:scale-95 ${
-                    activeColor === color.id
-                      ? 'border-indigo-600 ring-2 ring-indigo-300 dark:ring-indigo-900 scale-110'
+                  className={`w-7 h-7 rounded-full border transition-all duration-150 transform hover:scale-105 active:scale-95 flex items-center justify-center ${
+                    isSelected
+                      ? 'border-indigo-600 ring-2 ring-indigo-300 dark:ring-indigo-900 scale-110 shadow-md'
                       : 'border-transparent hover:border-slate-300'
                   }`}
                   style={{ backgroundColor: color.hex }}
                   title={language === 'es' ? color.label_es : color.label_en}
-                />
-              ))}
-            </div>
+                >
+                  {isSelected && (
+                    <div className="w-2 h-2 rounded-full bg-slate-900/40 dark:bg-white/40" />
+                  )}
+                </button>
+              );
+            })}
           </div>
-
-          {/* Brush size slider */}
-          <div className="flex items-center space-x-2 flex-grow md:flex-grow-0">
-            <span className="text-3xs text-slate-400 font-bold uppercase font-poppins flex-shrink-0">
-              {language === 'es' ? 'Pincel' : 'Brush'}:
-            </span>
-            <input
-              type="range"
-              min="3"
-              max="15"
-              value={brushSize}
-              onChange={(e) => setBrushSize(parseInt(e.target.value))}
-              className="w-24 accent-indigo-600 bg-slate-200/50 dark:bg-slate-800 rounded-lg cursor-pointer h-1.5"
-            />
-            <span className="text-2xs text-slate-500 w-4 text-right font-poppins font-bold flex-shrink-0">{brushSize}px</span>
-          </div>
-
         </div>
 
       </div>
