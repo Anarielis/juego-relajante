@@ -2,15 +2,55 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, RefreshCw, Eye, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Eye, Sparkles, CloudRain, ShieldAlert, Award } from 'lucide-react';
 import audioSynth from '../utils/audioSynth';
 import { trackPageView } from '../analytics/tracking';
 
 const SCENARIOS = [
-  { id: 'galaxy', name_es: 'Galaxia', name_en: 'Galaxy', color: 'from-purple-900 to-slate-950', icon: '🌌' },
-  { id: 'aurora', name_es: 'Aurora Boreal', name_en: 'Northern Lights', color: 'from-teal-950 to-slate-950', icon: '💚' },
-  { id: 'magic', name_es: 'Bosque Mágico', name_en: 'Magic Forest', color: 'from-emerald-950 to-slate-950', icon: '🌳' },
-  { id: 'night', name_es: 'Cielo Nocturno', name_en: 'Night Sky', color: 'from-indigo-950 to-slate-950', icon: '✨' }
+  { 
+    id: 'aurora', 
+    name_es: 'Lluvia Aurora', 
+    name_en: 'Aurora Rain', 
+    desc_es: 'Lluvia verde y esmeralda. El agua crea ondas concéntricas al tocar el suelo.',
+    desc_en: 'Emerald and teal drops. Water creates glowing ripples upon contact.',
+    colorClass: 'from-emerald-950 to-slate-950', 
+    icon: '💚',
+    particleColor: 'hsla(150, 100%, 70%, opacity)',
+    splashType: 'ripple'
+  },
+  { 
+    id: 'galaxy', 
+    name_es: 'Lluvia Cósmica', 
+    name_en: 'Cosmic Rain', 
+    desc_es: 'Gotas violetas y magenta con estrellas fugaces. Crea destellos celestes.',
+    desc_en: 'Violet and magenta drops with shooting stars. Spawns stardust on impact.',
+    colorClass: 'from-purple-950 to-slate-950', 
+    icon: '🌌',
+    particleColor: 'hsla(290, 100%, 75%, opacity)',
+    splashType: 'starburst'
+  },
+  { 
+    id: 'gold', 
+    name_es: 'Lluvia de Oro', 
+    name_en: 'Golden Rain', 
+    desc_es: 'Gotas de oro líquido y bronce. Al chocar, saltan chispas de luz brillante.',
+    desc_en: 'Liquid gold and amber drops. Bounces golden sparks upwards upon impact.',
+    colorClass: 'from-amber-950 to-slate-950', 
+    icon: '✨',
+    particleColor: 'hsla(45, 100%, 65%, opacity)',
+    splashType: 'sparks'
+  },
+  { 
+    id: 'sunset', 
+    name_es: 'Lluvia Atardecer', 
+    name_en: 'Sunset Breeze', 
+    desc_es: 'Gotas suaves coral y naranja que caen con el viento. Ondas tenues al caer.',
+    desc_en: 'Soft coral and peach drops swaying with wind. Elegant waves on bottom.',
+    colorClass: 'from-rose-950 to-slate-950', 
+    icon: '🌅',
+    particleColor: 'hsla(15, 100%, 70%, opacity)',
+    splashType: 'ripple'
+  }
 ];
 
 const LightRain = () => {
@@ -19,14 +59,23 @@ const LightRain = () => {
   const navigate = useNavigate();
 
   const canvasRef = useRef(null);
-  const [activeScenario, setActiveScenario] = useState('galaxy');
+  const containerRef = useRef(null);
+  const [activeScenario, setActiveScenario] = useState('aurora');
   const [playTime, setPlayTime] = useState(0);
+  const [splashesCount, setSplashesCount] = useState(0);
 
   const particlesRef = useRef([]);
-  const mouseRef = useRef({ x: 0, y: 0, active: false, px: 0, py: 0 });
+  const splashesRef = useRef([]);
+  const mouseRef = useRef({ x: 0, y: 0, active: false, lastActiveTime: 0 });
   const animationFrameId = useRef(null);
+  
+  // Keep track of the active scenario ID in a ref for the canvas animation loop
+  const activeScenarioRef = useRef(activeScenario);
+  useEffect(() => {
+    activeScenarioRef.current = activeScenario;
+  }, [activeScenario]);
 
-  // Time tracker
+  // Track page view and session time
   useEffect(() => {
     trackPageView('Light Rain Game');
     const interval = setInterval(() => {
@@ -39,289 +88,235 @@ const LightRain = () => {
     };
   }, [playTime]);
 
-  // Main Canvas Loop
+  // Initialize and handle canvas rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    
+    // Set display size and take into account high DPI screens
+    const resizeCanvas = () => {
+      const rect = containerRef.current?.getBoundingClientRect() || { width: 600, height: 450 };
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+    };
 
-    const width = canvas.parentElement.clientWidth;
-    const height = canvas.parentElement.clientHeight || 450;
-    canvas.width = width;
-    canvas.height = height;
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
-    const mouse = mouseRef.current;
+    // Initialize rain drops (limit to 120 for optimal performance on mobile)
+    const maxParticles = 120;
+    particlesRef.current = Array.from({ length: maxParticles }).map(() => spawnDrop(canvas.clientWidth || 600, canvas.clientHeight || 450, true));
+    splashesRef.current = [];
 
-    // Reset particles on scenario change
-    particlesRef.current = [];
+    function spawnDrop(width, height, randomY = false) {
+      return {
+        x: Math.random() * width,
+        y: randomY ? Math.random() * height : -20,
+        vy: Math.random() * 3.5 + 3.5, // vertical velocity (rain speed)
+        vx: (Math.random() - 0.5) * 0.4, // wind deviation
+        size: Math.random() * 1.5 + 1.2, // size thickness
+        alpha: Math.random() * 0.45 + 0.5,
+        length: Math.random() * 12 + 10 // visual rain stretch length
+      };
+    }
 
-    // Helper to spawn initial particles based on scenario
-    const spawnInitial = () => {
-      if (activeScenario === 'magic') {
-        // Fireflies scattered around
-        for (let i = 0; i < 60; i++) {
-          particlesRef.current.push({
-            x: Math.random() * width,
-            y: Math.random() * height,
-            vx: (Math.random() - 0.5) * 0.5,
-            vy: -Math.random() * 0.4 - 0.2,
-            size: Math.random() * 3 + 1.5,
-            color: `hsla(${60 + Math.random() * 60}, 100%, 70%, ${0.3 + Math.random() * 0.5})`, // yellow-green
-            angle: Math.random() * Math.PI * 2,
-            speed: 0.02 + Math.random() * 0.02
+    function createSplash(x, y, scenario) {
+      const type = scenario.splashType;
+      const baseColor = scenario.particleColor;
+      
+      if (type === 'ripple') {
+        splashesRef.current.push({
+          id: Math.random(),
+          type: 'ripple',
+          x,
+          y,
+          radius: 1,
+          maxRadius: Math.random() * 15 + 15,
+          alpha: 0.8,
+          speed: Math.random() * 0.8 + 0.8,
+          color: baseColor
+        });
+      } else if (type === 'starburst') {
+        const count = 4;
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+          const speed = Math.random() * 1.5 + 0.5;
+          splashesRef.current.push({
+            id: Math.random(),
+            type: 'spark',
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 0.5, // pull slightly up
+            size: Math.random() * 1.5 + 1,
+            alpha: 1.0,
+            decay: Math.random() * 0.04 + 0.03,
+            color: baseColor
           });
         }
-      } else if (activeScenario === 'night') {
-        // Starry sky backgrounds
-        for (let i = 0; i < 80; i++) {
-          particlesRef.current.push({
-            x: Math.random() * width,
-            y: Math.random() * height * 0.75, // only in upper sky
-            size: Math.random() * 1.5 + 0.5,
-            alpha: Math.random() * 0.8 + 0.2,
-            twinkleSpeed: 0.01 + Math.random() * 0.03,
-            isStar: true
+      } else if (type === 'sparks') {
+        const count = 5;
+        for (let i = 0; i < count; i++) {
+          const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2; // fountain shape pointing upwards
+          const speed = Math.random() * 2.2 + 0.8;
+          splashesRef.current.push({
+            id: Math.random(),
+            type: 'spark',
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: Math.random() * 2 + 1,
+            alpha: 1.0,
+            decay: Math.random() * 0.03 + 0.02,
+            gravity: 0.12, // physics gravity pulls sparks back down
+            color: baseColor
           });
         }
       }
-    };
-    spawnInitial();
+      
+      // Limit splashes count in buffer
+      if (splashesRef.current.length > 80) {
+        splashesRef.current.shift();
+      }
+    }
 
     const tick = () => {
-      // Draw background with slight trail blend for glow effects
-      ctx.fillStyle = 'rgba(10, 8, 20, 0.12)';
+      const width = canvas.style.width ? parseFloat(canvas.style.width) : canvas.width;
+      const height = canvas.style.height ? parseFloat(canvas.style.height) : canvas.height;
+      const scenId = activeScenarioRef.current;
+      const scenario = SCENARIOS.find(s => s.id === scenId) || SCENARIOS[0];
+
+      // Draw backdrop with trails (alpha controls trail length)
+      ctx.fillStyle = 'rgba(10, 8, 22, 0.22)';
       ctx.fillRect(0, 0, width, height);
 
+      // Glow effect configuration
+      ctx.globalCompositeOperation = 'lighter';
+
+      const mouse = mouseRef.current;
       const particles = particlesRef.current;
+      const splashes = splashesRef.current;
 
-      // 1. SCENARIO: GALAXY (Swirling pink/purple trails)
-      if (activeScenario === 'galaxy') {
-        // Spawn particles around cursor if active, or center of screen
-        const targetX = mouse.active ? mouse.x : width / 2;
-        const targetY = mouse.active ? mouse.y : height / 2;
-
-        if (Math.random() > 0.3) {
-          // Emit a cluster
-          for (let i = 0; i < 3; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 15 + 5;
-            particles.push({
-              x: targetX + Math.cos(angle) * dist,
-              y: targetY + Math.sin(angle) * dist,
-              vx: (Math.random() - 0.5) * 2,
-              vy: (Math.random() - 0.5) * 2,
-              size: Math.random() * 2 + 1,
-              hue: [280, 320, 200, 340][Math.floor(Math.random() * 4)] + (Math.random() * 20 - 10),
-              alpha: 1,
-              life: 1.0,
-              decay: 0.012 + Math.random() * 0.01
-            });
-          }
-        }
-
-        // Draw and update galaxy particles
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          
-          // Pull towards target (gravitational orbit force)
-          const dx = targetX - p.x;
-          const dy = targetY - p.y;
-          const dist = Math.hypot(dx, dy);
-          
-          if (dist > 5) {
-            // Radial pull
-            p.vx += (dx / dist) * 0.12;
-            p.vy += (dy / dist) * 0.12;
-            
-            // Tangential spiral drift force
-            p.vx += (-dy / dist) * 0.08;
-            p.vy += (dx / dist) * 0.08;
-          }
-
-          // Friction dampening
-          p.vx *= 0.95;
-          p.vy *= 0.95;
-
-          p.x += p.vx;
-          p.y += p.vy;
-
-          // Draw
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = `hsla(${p.hue}, 90%, 75%, ${p.alpha})`;
-          ctx.shadowBlur = p.size * 2;
-          ctx.shadowColor = `hsla(${p.hue}, 90%, 75%, 0.8)`;
-          ctx.fill();
-          ctx.shadowBlur = 0; // reset
-
-          p.alpha -= p.decay;
-          if (p.alpha <= 0) {
-            particles.splice(i, 1);
-          }
-        }
-      }
-
-      // 2. SCENARIO: AURORA BOREAL (Wavy green/blue glowing sheets)
-      else if (activeScenario === 'aurora') {
-        const time = Date.now() * 0.0008;
+      // 1. Update and draw rain drops
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
         
-        // Draw 3 curtains of aurora waves
-        for (let wave = 0; wave < 3; wave++) {
-          const hBase = height * 0.4 + (wave * 50);
-          const hue = 130 + (wave * 30); // transitions from green to teal
-          
-          ctx.save();
-          ctx.beginPath();
-          
-          for (let x = 0; x <= width; x += 15) {
-            // Wave equation with noise
-            let y = hBase + Math.sin(x * 0.005 + time + wave) * 30 + Math.cos(x * 0.01 - time * 0.5) * 15;
-            
-            // Distort wave near mouse position
-            if (mouse.active) {
-              const mxDist = Math.abs(mouse.x - x);
-              if (mxDist < 150) {
-                const strength = (1 - mxDist / 150) * 45;
-                // Wave is pushed down/up by mouse
-                y += Math.sin((mouse.y - y) * 0.02) * strength;
-              }
-            }
-
-            if (x === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-
-            // Draw a vertical glow stripe at each segment
-            ctx.strokeStyle = `hsla(${hue}, 85%, 60%, ${0.035 - (wave * 0.008)})`;
-            ctx.lineWidth = 14;
-            ctx.strokeRect(x, y - 60, 2, 120);
-          }
-          
-          ctx.strokeStyle = `hsla(${hue}, 90%, 65%, ${0.08 - (wave * 0.02)})`;
-          ctx.lineWidth = 4;
-          ctx.stroke();
-          ctx.restore();
+        // Wind drift in Sunset scenario
+        if (scenId === 'sunset') {
+          p.vx += Math.sin(Date.now() * 0.001 + p.x * 0.01) * 0.015;
+          p.vx = Math.max(-1.5, Math.min(1.5, p.vx));
         }
 
-        // Draw light wave sparkles
-        if (Math.random() > 0.7) {
-          particles.push({
-            x: Math.random() * width,
-            y: height * 0.2 + Math.random() * height * 0.5,
-            vx: (Math.random() - 0.5) * 0.4,
-            vy: (Math.random() - 0.5) * 0.4,
-            size: Math.random() * 2 + 1,
-            color: `hsla(${140 + Math.random() * 50}, 100%, 75%, ${0.1 + Math.random() * 0.4})`,
-            life: 1.0,
-            decay: 0.008 + Math.random() * 0.01
-          });
-        }
-
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          p.x += p.vx;
-          p.y += p.vy;
-
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.fill();
-
-          p.life -= p.decay;
-          if (p.life <= 0) particles.splice(i, 1);
-        }
-      }
-
-      // 3. SCENARIO: MAGIC FOREST (Floating upwards glowing fireflies)
-      else if (activeScenario === 'magic') {
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          
-          // Fireflies drift horizontally with sine wave
-          p.angle += p.speed;
-          p.x += Math.sin(p.angle) * 0.25 + p.vx;
-          p.y += p.vy;
-
-          // React to mouse: push away gently
-          if (mouse.active) {
-            const dx = mouse.x - p.x;
-            const dy = mouse.y - p.y;
+        // Apply mouse force field (umbrella repelling effect)
+        if (mouse.active) {
+          const dx = p.x - mouse.x;
+          const dy = p.y - mouse.y;
+          // Only repel if the rain drop is above or close to the cursor vertically
+          if (dy > -30 && dy < 90) {
             const dist = Math.hypot(dx, dy);
-            if (dist < 100) {
-              const force = (1 - dist / 100) * 0.5;
-              p.x -= (dx / dist) * force;
-              p.y -= (dy / dist) * force;
+            const umbrellaRadius = 90;
+            if (dist < umbrellaRadius) {
+              const force = (umbrellaRadius - dist) / umbrellaRadius;
+              // Push horizontally
+              p.vx += (dx / (dist || 1)) * force * 1.4;
+              // Slow down vertical fall
+              p.vy = Math.max(1.2, p.vy * 0.75);
             }
           }
+        }
 
-          // Wrap around canvas bounds
-          if (p.y < -10) p.y = height + 10;
-          if (p.x < -10) p.x = width + 10;
-          if (p.x > width + 10) p.x = -10;
+        // Add standard friction
+        p.vx *= 0.94;
 
-          // Draw firefly glow
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
+        // Move particle
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Wrap horizontal edges
+        if (p.x < -10) p.x = width + 10;
+        if (p.x > width + 10) p.x = -10;
+
+        // Splashing condition (hits the bottom floor)
+        if (p.y >= height - 8) {
+          createSplash(p.x, height - 8, scenario);
+          setSplashesCount(prev => prev + 1);
+
+          // Reset drop back to top
+          const newDrop = spawnDrop(width, height, false);
+          p.x = newDrop.x;
+          p.y = newDrop.y;
+          p.vx = newDrop.vx;
+          p.vy = newDrop.vy;
+          p.size = newDrop.size;
+          p.alpha = newDrop.alpha;
+        }
+
+        // Draw raindrop streak
+        ctx.beginPath();
+        ctx.strokeStyle = scenario.particleColor.replace('opacity', p.alpha);
+        ctx.lineWidth = p.size;
+        ctx.moveTo(p.x, p.y);
+        // Draw angled line based on velocities for realistic motion blur
+        ctx.lineTo(p.x - p.vx * 1.5, p.y - p.vy * 1.5);
+        ctx.stroke();
+      }
+
+      // 2. Update and draw splashes (Ripples & Sparks)
+      for (let i = splashes.length - 1; i >= 0; i--) {
+        const s = splashes[i];
+        
+        if (s.type === 'ripple') {
+          s.radius += s.speed;
+          s.alpha -= 0.024;
           
-          ctx.shadowBlur = p.size * 5;
-          ctx.shadowColor = p.color;
+          if (s.alpha <= 0 || s.radius >= s.maxRadius) {
+            splashes.splice(i, 1);
+            continue;
+          }
+
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = s.color.replace('opacity', s.alpha);
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        } else if (s.type === 'spark') {
+          // Physics updates
+          if (s.gravity) s.vy += s.gravity;
+          s.x += s.vx;
+          s.y += s.vy;
+          s.alpha -= s.decay;
+
+          if (s.alpha <= 0) {
+            splashes.splice(i, 1);
+            continue;
+          }
+
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+          ctx.fillStyle = s.color.replace('opacity', s.alpha);
           ctx.fill();
-          ctx.restore();
         }
       }
 
-      // 4. SCENARIO: NIGHT SKY (Constellations + Shooting stars)
-      else if (activeScenario === 'night') {
-        // Draw static starry background
-        particles.forEach(p => {
-          if (p.isStar) {
-            // Slow twinkling pulse
-            p.alpha += p.twinkleSpeed;
-            if (p.alpha > 0.95 || p.alpha < 0.2) {
-              p.twinkleSpeed = -p.twinkleSpeed;
-            }
-            
-            ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
-            ctx.fillRect(p.x, p.y, p.size, p.size);
-          }
-        });
-
-        // Trigger random shooting stars
-        if (Math.random() > 0.985) {
-          particles.push({
-            x: Math.random() * width * 0.6,
-            y: Math.random() * height * 0.4,
-            vx: Math.random() * 4 + 4,
-            vy: Math.random() * 3 + 2,
-            size: Math.random() * 2 + 1.5,
-            alpha: 1.0,
-            isShootingStar: true
-          });
-        }
-
-        // Draw and update active shooting stars
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          if (p.isShootingStar) {
-            // Draw streak tail line
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p.x - p.vx * 3.5, p.y - p.vy * 3.5);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${p.alpha})`;
-            ctx.lineWidth = p.size;
-            ctx.stroke();
-
-            p.x += p.vx;
-            p.y += p.vy;
-            p.alpha -= 0.035;
-
-            if (p.alpha <= 0 || p.x > width + 10 || p.y > height + 10) {
-              particles.splice(i, 1);
-            }
-          }
-        }
+      // 3. Draw a glowing indicator at the cursor coordinates (soft light spot)
+      if (mouse.active) {
+        ctx.beginPath();
+        const grad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 45);
+        grad.addColorStop(0, scenario.particleColor.replace('opacity', 0.25));
+        grad.addColorStop(1, scenario.particleColor.replace('opacity', 0));
+        ctx.fillStyle = grad;
+        ctx.arc(mouse.x, mouse.y, 45, 0, Math.PI * 2);
+        ctx.fill();
       }
+
+      // Reset composite operation to normal
+      ctx.globalCompositeOperation = 'source-over';
 
       animationFrameId.current = requestAnimationFrame(tick);
     };
@@ -329,27 +324,46 @@ const LightRain = () => {
     tick();
 
     return () => {
+      window.removeEventListener('resize', resizeCanvas);
       cancelAnimationFrame(animationFrameId.current);
     };
-  }, [activeScenario]);
+  }, []);
 
-  const handleMouseMove = (e) => {
+  // Update mouse state and coordinates
+  const updateMouseCoords = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
+    
+    // Support both mouse and touch events
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    mouseRef.current.x = clientX - rect.left;
-    mouseRef.current.y = clientY - rect.top;
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+
+    mouseRef.current.x = mx;
+    mouseRef.current.y = my;
     mouseRef.current.active = true;
+
+    // Trigger subtle, quick rain chime when cursor moves fast
+    const speedX = Math.abs(mx - mouseRef.current.prevX || 0);
+    if (speedX > 15 && Date.now() - mouseRef.current.lastActiveTime > 200) {
+      // Scale pitch with cursor vertical position: higher up = higher pitch
+      const normalizedY = 1.0 - (my / rect.height);
+      const pitch = 0.6 + (normalizedY * 0.7) + (Math.random() * 0.1 - 0.05);
+      audioSynth.playRaindropChime(pitch);
+      mouseRef.current.lastActiveTime = Date.now();
+    }
+    
+    mouseRef.current.prevX = mx;
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = () => {
     mouseRef.current.active = false;
   };
 
-  // Clicking on visual screen emits a ripple wave and plays chimes
+  // Clicking/Tapping triggers a larger manual ripple burst and chime sound
   const handleCanvasClick = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -360,28 +374,51 @@ const LightRain = () => {
     const clickX = clientX - rect.left;
     const clickY = clientY - rect.top;
 
-    // Trigger chimes
-    audioSynth.playBreathingBell();
+    const normalizedY = 1.0 - (clickY / rect.height);
+    const pitch = 0.7 + (normalizedY * 0.8);
+    audioSynth.playRaindropChime(pitch);
 
-    // Spawn a large ring of particles
-    const ringCount = 20;
-    const particles = particlesRef.current;
-    for (let i = 0; i < ringCount; i++) {
-      const angle = (i / ringCount) * Math.PI * 2;
-      const speed = Math.random() * 2 + 1;
-      particles.push({
+    // Create 15 explosive sparks
+    const scenario = SCENARIOS.find(s => s.id === activeScenario) || SCENARIOS[0];
+    const baseColor = scenario.particleColor;
+
+    for (let i = 0; i < 15; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 3 + 1;
+      splashesRef.current.push({
+        id: Math.random(),
+        type: 'spark',
         x: clickX,
         y: clickY,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: Math.random() * 2.5 + 1.5,
-        hue: activeScenario === 'aurora' ? 140 : activeScenario === 'magic' ? 70 : 320,
-        alpha: 1,
-        life: 1.0,
-        decay: 0.015 + Math.random() * 0.01
+        size: Math.random() * 2.5 + 1.2,
+        alpha: 1.0,
+        decay: Math.random() * 0.035 + 0.02,
+        color: baseColor
       });
     }
+
+    // Trigger a ripple too
+    splashesRef.current.push({
+      id: Math.random(),
+      type: 'ripple',
+      x: clickX,
+      y: clickY,
+      radius: 2,
+      maxRadius: 40,
+      alpha: 1.0,
+      speed: 2.2,
+      color: baseColor
+    });
   };
+
+  const resetCounter = () => {
+    setSplashesCount(0);
+    audioSynth.playBreathingBell();
+  };
+
+  const scenarioDetails = SCENARIOS.find(s => s.id === activeScenario);
 
   return (
     <div className="flex-1 flex flex-col space-y-4 select-none">
@@ -396,36 +433,63 @@ const LightRain = () => {
           <span>{t('welcome_title')}</span>
         </button>
 
-        <div className="flex items-center space-x-1 text-xs font-nunito text-slate-400">
-          <Eye className="w-4 h-4 text-indigo-400" />
-          <span>{language === 'es' ? 'Interactivo' : 'Interactive'}</span>
+        <div className="flex items-center space-x-3 text-xs font-nunito font-semibold text-slate-500 dark:text-slate-400">
+          <div className="flex items-center space-x-1">
+            <CloudRain className="w-4 h-4 text-indigo-400 animate-bounce" />
+            <span>{language === 'es' ? 'Gotas caídas' : 'Drops fallen'}:</span>
+            <span className="text-slate-800 dark:text-slate-200 font-bold font-poppins text-sm">{splashesCount}</span>
+          </div>
+
+          <button
+            onClick={resetCounter}
+            className="p-1 px-2.5 rounded-lg bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100/50 transition-colors text-3xs font-bold uppercase tracking-wider font-poppins"
+            title={language === 'es' ? 'Reiniciar gotero' : 'Reset drip counter'}
+          >
+            {language === 'es' ? 'Reiniciar' : 'Reset'}
+          </button>
         </div>
       </div>
 
-      {/* Main Canvas Box */}
-      <div className="flex-1 min-h-[380px] bg-[#0A0814] rounded-3xl overflow-hidden relative border border-slate-900 shadow-2xl">
+      {/* Main Canvas sandbox container */}
+      <div 
+        ref={containerRef}
+        className="flex-1 min-h-[380px] bg-[#0A0816] rounded-3xl overflow-hidden relative border border-slate-900 shadow-inner"
+      >
         <canvas
           ref={canvasRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onTouchStart={handleMouseMove}
-          onTouchMove={handleMouseMove}
-          onTouchEnd={handleMouseLeave}
+          onMouseMove={updateMouseCoords}
+          onMouseLeave={handlePointerLeave}
+          onTouchStart={updateMouseCoords}
+          onTouchMove={updateMouseCoords}
+          onTouchEnd={handlePointerLeave}
           onClick={handleCanvasClick}
-          className="absolute inset-0 cursor-pointer w-full h-full block touch-none"
+          className="absolute inset-0 cursor-crosshair w-full h-full block touch-none"
         />
 
-        {/* Dynamic header label inside canvas */}
-        <div className="absolute top-4 left-4 p-2 px-4 rounded-xl bg-slate-950/60 backdrop-blur-xs border border-white/5 pointer-events-none text-2xs font-bold text-slate-300 uppercase tracking-widest font-poppins">
-          {SCENARIOS.find(s => s.id === activeScenario)?.[`name_${language}`]}
+        {/* Floating guidance overlay */}
+        <div className="absolute top-4 left-4 p-2.5 px-4 rounded-2xl bg-slate-950/65 backdrop-blur-md border border-white/5 pointer-events-none font-nunito text-xs text-slate-300 flex items-center space-x-2.5 shadow-md">
+          <span className="text-sm">{scenarioDetails?.icon}</span>
+          <div>
+            <h4 className="font-bold text-2xs text-white uppercase tracking-wider font-poppins">
+              {scenarioDetails?.[`name_${language}`]}
+            </h4>
+            <p className="text-3xs text-slate-400 hidden md:block">
+              {scenarioDetails?.[`desc_${language}`]}
+            </p>
+          </div>
+        </div>
+
+        {/* Soft hint overlay */}
+        <div className="absolute bottom-4 right-4 p-2 px-3.5 rounded-xl bg-white/5 dark:bg-slate-950/40 border border-white/5 pointer-events-none text-3xs font-semibold text-slate-400 uppercase tracking-widest font-poppins">
+          {language === 'es' ? 'Desliza para desviar la lluvia' : 'Swipe to deflect the rain'}
         </div>
       </div>
 
       {/* Control Drawer Footer */}
-      <div className="glass p-4 rounded-3xl border border-white/20 dark:border-white/5 flex flex-col items-center space-y-3 font-nunito">
+      <div className="glass p-4 rounded-3xl border border-white/20 dark:border-white/5 flex flex-col items-center space-y-3 font-nunito shadow-sm">
         
         <span className="text-xs text-slate-400 font-bold uppercase tracking-wider font-poppins block w-full text-center md:text-left px-1">
-          {t('light_scenario')}
+          {language === 'es' ? 'Escenarios de Lluvia' : 'Rain Scenarios'}
         </span>
 
         {/* Scenario Selection Buttons */}
@@ -436,11 +500,14 @@ const LightRain = () => {
             return (
               <button
                 key={scen.id}
-                onClick={() => setActiveScenario(scen.id)}
-                className={`p-3 rounded-xl border flex items-center justify-center space-x-2.5 transition-all text-xs font-bold ${
+                onClick={() => {
+                  setActiveScenario(scen.id);
+                  audioSynth.playRaindropChime(0.9);
+                }}
+                className={`p-3 rounded-2xl border flex items-center justify-center space-x-2.5 transition-all text-xs font-bold ${
                   isSelected
-                    ? 'bg-indigo-600 text-white border-transparent shadow-sm scale-[1.02]'
-                    : 'bg-white/40 dark:bg-white/5 border-slate-200/50 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80'
+                    ? 'bg-indigo-600 text-white border-transparent shadow-md scale-[1.01]'
+                    : 'bg-white/40 dark:bg-white/5 border-slate-200/50 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10'
                 }`}
               >
                 <span className="text-sm">{scen.icon}</span>

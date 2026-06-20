@@ -410,12 +410,32 @@ class AudioSynthController {
     gainNode.gain.linearRampToValueAtTime(0.035 * intensity, now + 0.1);
     gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
 
-    noiseSource.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(this.masterGain);
-
     noiseSource.start(now);
     noiseSource.stop(now + 0.4);
+  }
+
+  // --- 7. LIGHT RAIN INTERACTIVE CHIMES ---
+  playRaindropChime(pitchMultiplier = 1.0) {
+    this.init();
+    if (!this.ctx || !this.enabled) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gainNode = this.ctx.createGain();
+
+    osc.type = 'sine';
+    // High-pitched crystal chime
+    osc.frequency.setValueAtTime(1600 * pitchMultiplier, now);
+    osc.frequency.exponentialRampToValueAtTime(800 * pitchMultiplier, now + 0.04);
+
+    gainNode.gain.setValueAtTime(0.05, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+    osc.connect(gainNode);
+    gainNode.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 0.1);
   }
 }
 
