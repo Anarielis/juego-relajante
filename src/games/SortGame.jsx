@@ -296,7 +296,7 @@ const SortGame = () => {
             ))}
             
             {/* Victory banner */}
-            <div className="absolute top-[45%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/70 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-3xl border border-indigo-200/50 shadow-xl text-center z-20 animate-fade-in max-w-sm">
+            <div className="absolute top-[45%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/70 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-3xl border border-indigo-200/50 shadow-xl text-center z-20 animate-fade-in max-w-sm pointer-events-auto">
               <Sparkles className="w-10 h-10 text-amber-500 mx-auto mb-2 animate-bounce" />
               <h3 className="text-xl font-bold font-poppins text-slate-800 dark:text-slate-100">
                 {language === 'es' ? '¡Todo en su Lugar!' : 'Perfectly Tidy!'}
@@ -305,8 +305,11 @@ const SortGame = () => {
                 {language === 'es' ? 'Siente el orden y el silencio. Tu mente está despejada.' : 'Feel the order and quietness. Your mind is clear.'}
               </p>
               <button
-                onClick={initializeItems}
-                className="mt-4 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition-colors font-poppins"
+                onClick={() => {
+                  audioSynth.playBreathingBell();
+                  initializeItems();
+                }}
+                className="mt-4 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition-all duration-150 font-poppins"
               >
                 {language === 'es' ? 'Volver a Ordenar' : 'Reset & Play'}
               </button>

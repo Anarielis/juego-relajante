@@ -16,7 +16,7 @@ const Settings = React.lazy(() => import('./pages/Settings'));
 const SortGame = React.lazy(() => import('./games/SortGame'));
 const PopIt = React.lazy(() => import('./games/PopIt'));
 const Breathing = React.lazy(() => import('./games/Breathing'));
-const Slime = React.lazy(() => import('./games/Slime'));
+const PuzzleGame = React.lazy(() => import('./games/PuzzleGame'));
 const LightRain = React.lazy(() => import('./games/LightRain'));
 
 // Calming loader indicator for lazy bundle downloads
@@ -124,7 +124,7 @@ function App() {
                 } />
                 <Route path="/game/slime" element={
                   <ProtectedRoute>
-                    <Slime />
+                    <PuzzleGame />
                   </ProtectedRoute>
                 } />
                 <Route path="/game/light-rain" element={

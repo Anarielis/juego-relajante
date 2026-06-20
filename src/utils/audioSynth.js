@@ -93,44 +93,44 @@ class AudioSynthController {
     noiseSource.stop(this.ctx.currentTime + 1.5);
   }
 
-  // --- 2. POP IT SOUNDS (Crisp bubble pops) ---
-  // Fast pitch envelope on a sine wave + tiny burst of noise
+  // --- 2. POP IT SOUNDS (Relaxing bubble pops) ---
+  // Fast pitch envelope on a sine wave + tiny burst of noise, made soft and gentle
   playPopSound(pitchMultiplier = 1.0) {
     this.init();
     if (!this.ctx || !this.enabled) return;
 
     const now = this.ctx.currentTime;
     
-    // 1. Oscillator for the "Pop" body
+    // 1. Oscillator for the "Pop" body (soft, deep sine drop)
     const osc = this.ctx.createOscillator();
     const gainNode = this.ctx.createGain();
     
     osc.type = 'sine';
-    // Pitch drops very fast (120Hz down to 40Hz)
-    const baseFreq = 140 * pitchMultiplier;
+    // Lower frequency sweep for a warmer bubble sound
+    const baseFreq = 120 * pitchMultiplier;
     osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(45, now + 0.07);
+    osc.frequency.exponentialRampToValueAtTime(35, now + 0.08);
 
-    // INCREASED GAIN FOR MORE REALISTIC AND LOUDER POP
-    gainNode.gain.setValueAtTime(0.85, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    // Gentle gain for a relaxing pop
+    gainNode.gain.setValueAtTime(0.28, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(gainNode);
     gainNode.connect(this.masterGain);
 
-    // 2. High pass click for crisp attack (Tactile snappy click)
+    // 2. Soft high click for tactile bubble wrap feel
     const clickOsc = this.ctx.createOscillator();
     const clickGain = this.ctx.createGain();
     clickOsc.type = 'triangle';
-    clickOsc.frequency.setValueAtTime(1400 * pitchMultiplier, now);
-    clickGain.gain.setValueAtTime(0.18, now);
+    clickOsc.frequency.setValueAtTime(900 * pitchMultiplier, now);
+    clickGain.gain.setValueAtTime(0.03, now);
     clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
 
     clickOsc.connect(clickGain);
     clickGain.connect(this.masterGain);
 
     osc.start(now);
-    osc.stop(now + 0.08);
+    osc.stop(now + 0.09);
     clickOsc.start(now);
     clickOsc.stop(now + 0.02);
   }

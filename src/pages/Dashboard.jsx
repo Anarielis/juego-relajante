@@ -95,26 +95,33 @@ const Dashboard = () => {
       )
     },
     {
-      id: 'slime',
-      name_es: 'Slime Simulator',
-      name_en: 'Slime Simulator',
-      desc_es: 'Amasa, estira y deforma slime gelatinoso cambiando colores, brillantinas y texturas ASMR.',
-      desc_en: 'Squash, stretch, and deform a gel slime mesh, customizing pastel colors, glitters, and textures.',
+      id: 'slime', // Kept under 'slime' ID for routing consistency
+      name_es: 'Rompecabezas Zen',
+      name_en: 'Zen Jigsaw Puzzle',
+      desc_es: 'Reconstruye hermosos paisajes de atardeceres y piedras de meditación con chasquidos relajantes.',
+      desc_en: 'Reconstruct beautiful sunset landscape and meditation stones artwork with relaxing clicks.',
       color: 'from-pastel-rose-light to-pastel-rose border-pastel-rose-hover',
       svg: (
         <svg viewBox="0 0 100 100" className="w-full h-full opacity-85 dark:opacity-75">
           <rect width="100" height="100" fill="#FDF0F3" rx="16" />
-          {/* Slime fluid body */}
-          <path d="M 30,50 C 30,35 45,30 60,35 C 75,40 80,55 70,70 C 60,80 40,75 30,70 Z" fill="url(#slimeGradient)" />
-          {/* Sparkles */}
-          <path d="M 45,45 L 47,42 L 49,45 L 47,48 Z" fill="#FFF" />
-          <path d="M 62,58 L 64,55 L 66,58 L 64,61 Z" fill="#FFF" />
-          <circle cx="38" cy="62" r="1.5" fill="#FFF" opacity="0.8" />
-          <circle cx="68" cy="42" r="1.5" fill="#FFF" opacity="0.8" />
+          {/* Sunset sky background */}
+          <rect x="12" y="12" width="76" height="76" rx="6" fill="url(#puzSky)" />
+          {/* Glowing Sun */}
+          <circle cx="50" cy="50" r="14" fill="#EC7063" />
+          {/* Zen Stone Stack */}
+          <ellipse cx="50" cy="74" rx="16" ry="6" fill="#1C152E" />
+          <ellipse cx="50" cy="65" rx="12" ry="4" fill="#2E2445" />
+          <ellipse cx="50" cy="59" rx="8" ry="3" fill="#40335D" />
+          {/* Grid lines to represent puzzle pieces */}
+          <line x1="37" y1="12" x2="37" y2="88" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+          <line x1="63" y1="12" x2="63" y2="88" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+          <line x1="12" y1="37" x2="88" y2="37" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+          <line x1="12" y1="63" x2="88" y2="63" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
           <defs>
-            <linearGradient id="slimeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FAD3DC" />
-              <stop offset="100%" stopColor="#E6A8C1" />
+            <linearGradient id="puzSky" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#2E1A47" />
+              <stop offset="60%" stopColor="#E06C75" />
+              <stop offset="100%" stopColor="#E5C07B" />
             </linearGradient>
           </defs>
         </svg>

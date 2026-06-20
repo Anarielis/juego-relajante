@@ -105,30 +105,35 @@ const Breathing = () => {
       activeHumRef.current = audioSynth.startBreathingHum('exhale');
     }
 
+    let currentSec = currentStep.duration;
+
     // Step Countdown Timer
-    timerRef.current = setInterval(() => {
-      setSecondsRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          
-          // Move to next step in sequence
-          setStepIndex((idx) => {
-            const nextIdx = idx + 1;
-            if (nextIdx >= activeSequence.length) {
-              // Completed a full breathing cycle!
-              setSessionCount(c => c + 1);
-              return 0; // Reset back to first step (loop)
-            }
-            return nextIdx;
-          });
-          return 0;
-        }
-        return prev - 1;
-      });
+    const interval = setInterval(() => {
+      currentSec -= 1;
+      if (currentSec <= 0) {
+        clearInterval(interval);
+        
+        // Move to next step in sequence
+        setStepIndex((idx) => {
+          const nextIdx = idx + 1;
+          if (nextIdx >= activeSequence.length) {
+            // Completed a full breathing cycle!
+            setSessionCount(c => c + 1);
+            return 0; // Reset back to first step (loop)
+          }
+          return nextIdx;
+        });
+      } else {
+        setSecondsRemaining(currentSec);
+      }
     }, 1000);
 
     return () => {
-      clearInterval(timerRef.current);
+      clearInterval(interval);
+      if (activeHumRef.current) {
+        activeHumRef.current.stop();
+        activeHumRef.current = null;
+      }
     };
   }, [isPlaying, stepIndex, activeMode]);
 
@@ -145,7 +150,6 @@ const Breathing = () => {
       activeHumRef.current.stop();
       activeHumRef.current = null;
     }
-    clearInterval(timerRef.current);
   };
 
   // Determine sphere scale based on state & remaining seconds
