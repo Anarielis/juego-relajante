@@ -128,28 +128,24 @@ const Dashboard = () => {
       )
     },
     {
-      id: 'light-rain',
-      name_es: 'Lluvia de Luz',
-      name_en: 'Light Rain',
-      desc_es: 'Genera fluidos luminosos en escenarios interactivos inspirados en la aurora boreal y el cosmos.',
-      desc_en: 'Interact with glowing particle streams in scenarios inspired by northern lights and deep cosmos.',
+      id: 'light-rain', // Kept for routing consistency
+      name_es: 'Colorear Mandalas',
+      name_en: 'Zen Coloring Canvas',
+      desc_es: 'Pinta líneas y colorea hermosos mandalas y flores de loto con pinceles de luz de neón y sonidos ASMR.',
+      desc_en: 'Paint lines and color beautiful mandalas and lotus outlines with neon light brushes and relaxing sounds.',
       color: 'from-pastel-lavender-light to-pastel-lavender border-pastel-lavender-hover',
       svg: (
         <svg viewBox="0 0 100 100" className="w-full h-full opacity-85 dark:opacity-75">
-          <rect width="100" height="100" fill="#EBE9F8" rx="16" />
-          {/* Northern light lines */}
-          <path d="M 10,80 C 25,60 45,75 60,50 C 75,25 85,45 95,20" fill="none" stroke="url(#lightGradient)" strokeWidth="8" strokeLinecap="round" opacity="0.7" />
-          {/* Shimmering stars */}
-          <circle cx="20" cy="30" r="1.5" fill="#FFF" />
-          <circle cx="80" cy="70" r="2" fill="#FFF" className="animate-ping" style={{ animationDuration: '3s' }} />
-          <circle cx="45" cy="20" r="1" fill="#FFF" />
-          <defs>
-            <linearGradient id="lightGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#CBE5F5" />
-              <stop offset="50%" stopColor="#D1CBEA" />
-              <stop offset="100%" stopColor="#FAD3DC" />
-            </linearGradient>
-          </defs>
+          <rect width="100" height="100" fill="#F0EEFD" rx="16" />
+          {/* Concentric Mandala outline style */}
+          <circle cx="50" cy="50" r="34" fill="none" stroke="#A855F7" strokeWidth="1.5" />
+          <circle cx="50" cy="50" r="24" fill="none" stroke="#10B981" strokeWidth="1.5" />
+          <circle cx="50" cy="50" r="14" fill="none" stroke="#F59E0B" strokeWidth="1.5" />
+          {/* Rays */}
+          <line x1="50" y1="10" x2="50" y2="90" stroke="#E0DDF7" strokeWidth="1" />
+          <line x1="10" y1="50" x2="90" y2="50" stroke="#E0DDF7" strokeWidth="1" />
+          <line x1="22" y1="22" x2="78" y2="78" stroke="#E0DDF7" strokeWidth="1" />
+          <line x1="22" y1="78" x2="78" y2="22" stroke="#E0DDF7" strokeWidth="1" />
         </svg>
       )
     }

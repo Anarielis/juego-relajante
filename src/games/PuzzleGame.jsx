@@ -317,7 +317,7 @@ const PuzzleGame = () => {
                   piece 
                     ? isCorrect
                       ? 'border-emerald-400 shadow-sm pointer-events-none scale-100'
-                      : 'border-amber-400/80 shadow-md hover:border-amber-500'
+                      : 'border-rose-500 ring-2 ring-rose-500/30 scale-95 shadow-md hover:scale-100 bg-rose-500/5'
                     : 'border-dashed border-slate-400/40 dark:border-white/10 hover:bg-white/10 dark:hover:bg-white/5 flex items-center justify-center bg-slate-300/10'
                 }`}
               >
@@ -325,9 +325,13 @@ const PuzzleGame = () => {
                 {piece ? (
                   <>
                     {renderPieceImage(piece.row, piece.col)}
-                    {isCorrect && (
+                    {isCorrect ? (
                       <div className="absolute top-1 right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow z-10 animate-fade-in">
                         <Check className="w-2.5 h-2.5" />
+                      </div>
+                    ) : (
+                      <div className="absolute top-1 right-1 bg-rose-500 text-white w-4 h-4 rounded-full shadow z-10 flex items-center justify-center text-[10px] font-extrabold animate-pulse">
+                        ✕
                       </div>
                     )}
                   </>
